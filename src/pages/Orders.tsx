@@ -18,7 +18,8 @@ import {
   ArrowRight,
   AlertCircle,
   Check,
-  Users
+  Users,
+  ShoppingBag
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -41,7 +42,7 @@ const statusLabels = {
 };
 
 export default function Orders() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

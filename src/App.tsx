@@ -9,9 +9,11 @@ import {
   Menu,
   X,
   Bell,
+  BellOff,
   LogOut,
   ChevronRight,
-  Star
+  Star,
+  ShieldAlert
 } from 'lucide-react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -33,6 +35,9 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [toastOrder, setToastOrder] = useState<{ id: number; name: string; amount: number } | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    "Notification" in window ? Notification.permission : "denied"
+  );
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -166,7 +171,32 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [notificationPermission]);
+
+  const requestNotificationPermission = async () => {
+    if (!("Notification" in window)) return;
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission === "granted") {
+        // Play a quick sound to prime the audio system
+        const audio = new Audio('https://res.cloudinary.com/dlwuxgvse/video/upload/v1772274343/6GYhcxV_rSI_eohbgv.mp3');
+        audio.volume = 0.01; // Almost silent
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log("🔊 Audio primed successfully");
+          }).catch(error => {
+            console.log("🔇 Audio priming failed:", error);
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error requesting notification permission:", error);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-brand-white overflow-hidden font-sans">
@@ -271,13 +301,25 @@ export default function App() {
                   showNotifications && "bg-brand-gray"
                 )}
               >
-                <Bell size={20} />
+                {notificationPermission === 'granted' ? <Bell size={20} /> : <BellOff size={20} className="text-amber-500" />}
                 {notifications.length > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white">
                     {notifications.length > 9 ? '9+' : notifications.length}
                   </span>
                 )}
               </button>
+
+              {notificationPermission !== 'granted' && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={requestNotificationPermission}
+                  className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-amber-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 hover:bg-amber-600 transition-colors z-50 animate-bounce"
+                >
+                  <ShieldAlert size={12} />
+                  تفعيل التنبيهات
+                </motion.button>
+              )}
 
               <AnimatePresence>
                 {showNotifications && (
