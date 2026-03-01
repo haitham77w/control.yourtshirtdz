@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
-  Eye, 
-  CheckCircle2, 
-  Truck, 
-  XCircle, 
+import {
+  Search,
+  Filter,
+  Eye,
+  CheckCircle2,
+  Truck,
+  XCircle,
   Clock,
   ExternalLink,
   Phone,
@@ -62,7 +62,7 @@ export default function Orders() {
       const targetOrder = orders.find(o => o.id === parseInt(orderIdFromNotification));
       if (targetOrder) {
         setSelectedOrder(targetOrder);
-        
+
         // Scroll to the order in the table
         setTimeout(() => {
           const orderRow = document.querySelector(`[data-order-id="${targetOrder.id}"]`);
@@ -86,7 +86,7 @@ export default function Orders() {
         .select('id')
         .in('status', FINAL_STATUSES)
         .lt('created_at', fiveDaysAgo);
-      
+
       if (oldOrders?.length) {
         await supabase.from('orders').delete().in('id', oldOrders.map(o => o.id));
       }
@@ -100,7 +100,7 @@ export default function Orders() {
           items:order_items(*)
         `)
         .order('created_at', { ascending: false });
-      
+
       const sorted = (data as any[] || []).sort((a, b) => {
         const aPending = a.status === 'pending';
         const bPending = b.status === 'pending';
@@ -108,7 +108,7 @@ export default function Orders() {
         if (!aPending && bPending) return 1;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-      
+
       // Fetch product details for each order item
       const ordersWithProducts = await Promise.all(
         sorted.map(async (order) => {
@@ -116,7 +116,7 @@ export default function Orders() {
             (order.items || []).map(async (item) => {
               let product = null;
               let variant = null;
-              
+
               // Try to get regular product first
               if (item.product_id) {
                 const { data: regularProduct } = await supabase
@@ -126,7 +126,7 @@ export default function Orders() {
                   .single();
                 product = regularProduct;
               }
-              
+
               // Try to get featured product if regular product not found
               if (!product && item.product_id) {
                 const { data: featuredProduct } = await supabase
@@ -136,7 +136,7 @@ export default function Orders() {
                   .single();
                 product = featuredProduct;
               }
-              
+
               // Get variant details
               if (item.variant_id) {
                 const { data: variantData } = await supabase
@@ -146,7 +146,7 @@ export default function Orders() {
                   .single();
                 variant = variantData;
               }
-              
+
               return {
                 ...item,
                 product,
@@ -154,16 +154,16 @@ export default function Orders() {
               };
             })
           );
-          
+
           return {
             ...order,
             items: itemsWithProducts
           };
         })
       );
-      
+
       setOrders(ordersWithProducts);
-      
+
       // Reserve stock for new pending orders
       for (const order of sorted) {
         if (order.status === 'pending') {
@@ -184,26 +184,26 @@ export default function Orders() {
   // Return stock when order is cancelled
   const returnStock = async (order: Order) => {
     if (!order.items?.length) return;
-    
+
     try {
       for (const item of order.items) {
         if (!item.variant_id) continue;
-        
+
         const { data: variant } = await supabase
           .from('product_variants')
           .select('quantity')
           .eq('id', item.variant_id)
           .single();
-          
+
         if (variant) {
           const currentStock = variant.quantity || 0;
           const newStock = currentStock + item.quantity;
-          
+
           await supabase
             .from('product_variants')
             .update({ quantity: newStock })
             .eq('id', item.variant_id);
-            
+
           console.log(`Returned ${item.quantity} units to stock for variant ${item.variant_id}`);
         }
       }
@@ -221,17 +221,17 @@ export default function Orders() {
   // Release reserved stock when order is cancelled
   const releaseReservedStock = async (order: Order) => {
     if (!order.items?.length) return;
-    
+
     try {
       for (const item of order.items) {
         if (!item.variant_id) continue;
-        
+
         const { data: variant } = await supabase
           .from('product_variants')
           .select('reserved_quantity')
           .eq('id', item.variant_id)
           .single();
-          
+
         if (variant && variant.reserved_quantity) {
           const newReserved = Math.max(0, variant.reserved_quantity - item.quantity);
           await supabase
@@ -252,18 +252,18 @@ export default function Orders() {
     setUpdatingStatus(true);
     try {
       // Handle stock operations based on status changes
-    const oldStatus = order.status;
-    
-    // If cancelling, return stock to inventory
-    if (newStatus === 'cancelled' && oldStatus === 'pending') {
-      await returnStock(order);
-    }
-    
-    // If confirming from pending, stock is already deducted
-    if (newStatus === 'confirmed' && oldStatus === 'pending') {
-      // Stock was already deducted when order was created
-      console.log('Order confirmed - stock already deducted');
-    }
+      const oldStatus = order.status;
+
+      // If cancelling, return stock to inventory
+      if (newStatus === 'cancelled' && oldStatus === 'pending') {
+        await returnStock(order);
+      }
+
+      // If confirming from pending, stock is already deducted
+      if (newStatus === 'confirmed' && oldStatus === 'pending') {
+        // Stock was already deducted when order was created
+        console.log('Order confirmed - stock already deducted');
+      }
 
       const orderPayload: Record<string, unknown> = { status: newStatus };
 
@@ -279,9 +279,9 @@ export default function Orders() {
       }
 
       setShowConfirmModal(false);
-      setOrders(prevOrders => 
-        prevOrders.map(o => 
-          o.id === orderId 
+      setOrders(prevOrders =>
+        prevOrders.map(o =>
+          o.id === orderId
             ? { ...o, status: newStatus as Order['status'] }
             : o
         )
@@ -414,14 +414,14 @@ export default function Orders() {
     }
   };
 
-  const filteredOrders = orders.filter(o => 
+  const filteredOrders = orders.filter(o =>
     `${o.first_name} ${o.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.phone.includes(searchTerm) ||
     o.id.toString().includes(searchTerm)
   );
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-8"
@@ -442,19 +442,19 @@ export default function Orders() {
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-black/30" size={20} />
-          <input 
-            type="text" 
-            placeholder="البحث بالاسم، الهاتف أو رقم الطلب..." 
-            className="input-field pr-12"
+          <input
+            type="text"
+            placeholder="البحث بالاسم، الهاتف أو رقم الطلب..."
+            className="input-field pr-12 text-sm sm:text-base"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar scroll-smooth">
           {['الكل', 'قيد الانتظار', 'تم التأكيد', 'تم الشحن', 'تم التوصيل', 'ملغى'].map(status => (
-            <button 
+            <button
               key={status}
-              className="px-4 py-2 rounded-xl text-sm font-bold border border-brand-border hover:bg-brand-black hover:text-brand-white transition-all whitespace-nowrap capitalize"
+              className="px-4 py-2 rounded-xl text-[10px] sm:text-sm font-bold border border-brand-border hover:bg-brand-black hover:text-brand-white transition-all whitespace-nowrap capitalize"
             >
               {status}
             </button>
@@ -462,9 +462,10 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Table & Cards */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="border-b border-brand-border bg-brand-gray/50">
@@ -479,8 +480,8 @@ export default function Orders() {
             </thead>
             <tbody>
               {filteredOrders.map((order) => (
-                <tr 
-                  key={order.id} 
+                <tr
+                  key={order.id}
                   data-order-id={order.id}
                   className={cn(
                     "border-b border-brand-border hover:bg-brand-gray/20 transition-colors group",
@@ -517,7 +518,7 @@ export default function Orders() {
                     {new Date(order.created_at).toLocaleDateString()}
                   </td>
                   <td className="p-6 text-left">
-                    <button 
+                    <button
                       onClick={() => setSelectedOrder(order)}
                       className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
                     >
@@ -526,51 +527,85 @@ export default function Orders() {
                   </td>
                 </tr>
               ))}
-              {filteredOrders.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-brand-black/40">
-                    لم يتم العثور على طلبات.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="sm:hidden divide-y divide-brand-border max-h-[70vh] overflow-y-auto custom-scrollbar">
+          {filteredOrders.map((order) => (
+            <div
+              key={order.id}
+              onClick={() => setSelectedOrder(order)}
+              className={cn(
+                "p-4 active:bg-brand-gray/20 transition-colors",
+                shouldHighlight && order.id === parseInt(orderIdFromNotification || '0') && "bg-amber-50"
+              )}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex flex-col">
+                  <span className="font-mono text-[10px] text-brand-black/40 mb-1">#{order.id.toString().padStart(5, '0')}</span>
+                  <p className="font-bold text-sm">{order.first_name} {order.last_name}</p>
+                  <p className="text-xs text-brand-black/50 mt-0.5">{order.phone}</p>
+                </div>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[9px] uppercase font-bold tracking-tight border",
+                  statusColors[order.status as keyof typeof statusColors]
+                )}>
+                  {statusLabels[order.status as keyof typeof statusLabels]}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <div className="text-brand-black/60">
+                  <p>{order.wilaya?.name_ar}</p>
+                  <p className="text-[10px]">{order.delivery_method === 'home' ? 'توصيل للمنزل' : 'توصيل للمكتب'}</p>
+                </div>
+                <p className="font-bold text-brand-black">{formatCurrency(order.total_amount)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredOrders.length === 0 && !loading && (
+          <div className="p-12 text-center text-brand-black/40">
+            لم يتم العثور على طلبات.
+          </div>
+        )}
       </div>
 
       {/* Order Details Modal */}
       <AnimatePresence>
         {selectedOrder && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => { setSelectedOrder(null); setShowConfirmModal(false); }}
               className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-4xl bg-brand-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 border-b border-brand-border flex items-center justify-between bg-brand-black text-brand-white">
+              <div className="p-4 sm:p-8 border-b border-brand-border flex items-center justify-between bg-brand-black text-brand-white">
                 <div>
-                  <h2 className="text-2xl font-bold">تفاصيل الطلب</h2>
-                  <p className="text-brand-white/60 text-sm font-mono">#{selectedOrder.id.toString().padStart(5, '0')}</p>
+                  <h2 className="text-xl sm:text-2xl font-bold">تفاصيل الطلب</h2>
+                  <p className="text-brand-white/60 text-[10px] sm:text-sm font-mono">#{selectedOrder.id.toString().padStart(5, '0')}</p>
                 </div>
                 <button onClick={() => { setSelectedOrder(null); setShowConfirmModal(false); }} className="p-2 hover:bg-brand-white/10 rounded-full">
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
                   {/* Customer Info */}
-                  <div className="lg:col-span-2 space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="glass-card p-6 space-y-4">
+                  <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="glass-card p-4 sm:p-6 space-y-4">
                         <div className="flex items-center gap-3 text-brand-black/40">
                           <Users size={18} />
                           <span className="text-xs font-bold uppercase tracking-widest">الزبون</span>
@@ -610,7 +645,7 @@ export default function Orders() {
 
                     {/* Order Items */}
                     <div className="glass-card overflow-hidden">
-                      <div className="p-6 border-b border-brand-border bg-brand-gray/30">
+                      <div className="p-4 sm:p-6 border-b border-brand-border bg-brand-gray/30">
                         <div className="flex items-center gap-3 text-brand-black/40">
                           <Package size={18} />
                           <span className="text-xs font-bold uppercase tracking-widest">المنتجات</span>
@@ -618,20 +653,20 @@ export default function Orders() {
                       </div>
                       <div className="divide-y divide-brand-border">
                         {selectedOrder.items?.map((item) => (
-                          <div key={item.id} className="p-6 flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 bg-brand-gray rounded-xl overflow-hidden">
+                          <div key={item.id} className="p-4 sm:p-6 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-brand-gray rounded-xl overflow-hidden shrink-0">
                                 <img src={item.product?.image_url || '/placeholder.jpg'} alt="" className="w-full h-full object-cover" />
                               </div>
                               <div>
-                                <p className="font-bold text-sm">{item.product?.name_ar || 'منتج غير معروف'}</p>
-                                <p className="text-xs text-brand-black/50">
-                                  المقاس: {item.variant?.size} | اللون: {item.variant?.color}
+                                <p className="font-bold text-xs sm:text-sm leading-tight">{item.product?.name_ar || 'منتج غير معروف'}</p>
+                                <p className="text-[10px] sm:text-xs text-brand-black/50 mt-0.5">
+                                  {item.variant?.size} | {item.variant?.color}
                                 </p>
-                                <p className="text-xs mt-1">الكمية: {item.quantity}</p>
+                                <p className="text-[10px] sm:text-xs mt-1">الكمية: {item.quantity}</p>
                               </div>
                             </div>
-                            <p className="font-bold">{formatCurrency(item.price_at_purchase * item.quantity)}</p>
+                            <p className="font-bold text-xs sm:text-base whitespace-nowrap">{formatCurrency(item.price_at_purchase * item.quantity)}</p>
                           </div>
                         ))}
                       </div>
@@ -654,17 +689,17 @@ export default function Orders() {
 
                   {/* Actions & Status */}
                   <div className="space-y-6">
-                    <div className="glass-card p-6 space-y-6">
+                    <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6">
                       <div className="flex items-center gap-3 text-brand-black/40">
                         <Clock size={18} />
                         <span className="text-xs font-bold uppercase tracking-widest">إدارة الحالة</span>
                       </div>
-                      
+
                       {/* Status Timeline */}
-                      <div className="relative">
+                      <div className="relative pr-2 sm:pr-0">
                         <div className="absolute right-6 top-8 bottom-8 w-0.5 bg-brand-border"></div>
-                        
-                        <div className="space-y-4">
+
+                        <div className="space-y-3 sm:space-y-4">
                           {[
                             { id: 'pending', label: 'قيد الانتظار', icon: Clock, description: 'طلب جديد' },
                             { id: 'confirmed', label: 'تأكيد الطلب', icon: CheckCircle2, description: 'تم تأكيد الطلب' },
@@ -676,29 +711,29 @@ export default function Orders() {
                             const isPast = index < [
                               'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'
                             ].indexOf(selectedOrder.status);
-                            
+
                             return (
-                              <div key={status.id} className="relative flex items-center gap-4">
+                              <div key={status.id} className="relative flex items-center gap-3 sm:gap-4">
                                 {/* Status Node */}
                                 <div className="relative z-10">
                                   <button
                                     onClick={() => updateStatus(selectedOrder.id, status.id)}
                                     className={cn(
-                                      "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                                      isActive 
-                                        ? "bg-brand-black text-brand-white border-brand-black shadow-lg scale-110" 
+                                      "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all border-2",
+                                      isActive
+                                        ? "bg-brand-black text-brand-white border-brand-black shadow-lg scale-110"
                                         : isPast
-                                        ? "bg-emerald-500 text-white border-emerald-500"
-                                        : "bg-brand-white text-brand-black/40 border-brand-border hover:border-brand-black/60 hover:scale-105"
+                                          ? "bg-emerald-500 text-white border-emerald-500"
+                                          : "bg-brand-white text-brand-black/40 border-brand-border hover:border-brand-black/60 hover:scale-105"
                                     )}
                                   >
-                                    <status.icon size={20} />
+                                    <status.icon size={16} />
                                   </button>
                                   {isActive && (
                                     <div className="absolute -inset-1 bg-brand-black/20 rounded-full animate-ping"></div>
                                   )}
                                 </div>
-                                
+
                                 {/* Status Content */}
                                 <div className="flex-1">
                                   <button
@@ -708,20 +743,17 @@ export default function Orders() {
                                     <div className="flex items-center justify-between">
                                       <div>
                                         <p className={cn(
-                                          "font-bold text-sm transition-colors",
+                                          "font-bold text-[13px] sm:text-sm transition-colors",
                                           isActive ? "text-brand-black" : "text-brand-black/60 group-hover:text-brand-black"
                                         )}>
                                           {status.label}
                                         </p>
-                                        <p className="text-xs text-brand-black/40 mt-0.5">
+                                        <p className="text-[10px] sm:text-xs text-brand-black/40 mt-0.5">
                                           {status.description}
                                         </p>
                                       </div>
                                       {isActive && (
                                         <Check className="text-emerald-500" size={16} />
-                                      )}
-                                      {!isActive && !isPast && (
-                                        <ArrowRight className="text-brand-black/20 group-hover:text-brand-black/40 transition-colors" size={16} />
                                       )}
                                     </div>
                                   </button>
@@ -762,19 +794,19 @@ export default function Orders() {
                     )}
 
                     <div className="glass-card p-6">
-                      <button 
+                      <button
                         onClick={handlePrint}
                         className="w-full btn-secondary flex items-center justify-center gap-2 mb-3"
                       >
                         طباعة الفاتورة
                       </button>
-                      <button 
+                      <button
                         onClick={handleContact}
                         className="w-full btn-secondary flex items-center justify-center gap-2 mb-3"
                       >
                         الاتصال بالزبون (واتساب)
                       </button>
-                      <button 
+                      <button
                         onClick={handleDeleteOrder}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 hover:bg-rose-50 transition-all"
                       >

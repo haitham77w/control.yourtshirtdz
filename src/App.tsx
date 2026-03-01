@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Tag, 
-  MapPin, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Tag,
+  MapPin,
   Settings as SettingsIcon,
   Menu,
   X,
@@ -70,14 +70,14 @@ export default function App() {
     }
 
     // Deduct stock immediately when new order is created
-  const deductStockImmediately = async (orderId: number) => {
-    try {
-      console.log(`🔄 Starting immediate stock deduction for order ${orderId}`);
-      
-      // Get order items with product variants
-      const { data: orderItems, error: itemsError } = await supabase
-        .from('order_items')
-        .select(`
+    const deductStockImmediately = async (orderId: number) => {
+      try {
+        console.log(`🔄 Starting immediate stock deduction for order ${orderId}`);
+
+        // Get order items with product variants
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('order_items')
+          .select(`
           product_id,
           variant_id,
           quantity,
@@ -86,54 +86,54 @@ export default function App() {
             quantity
           )
         `)
-        .eq('order_id', orderId);
+          .eq('order_id', orderId);
 
-      if (itemsError) {
-        console.error('❌ Error fetching order items:', itemsError);
-        return;
-      }
-
-      console.log('📦 Processing order items for immediate stock deduction:', orderItems);
-
-      // Deduct stock for each item
-      for (const item of orderItems || []) {
-        if (item.variant_id && item.product_variants) {
-          const currentStock = item.product_variants.quantity || 0;
-          const newStock = currentStock - item.quantity;
-          
-          console.log(`📊 Product ${item.product_id} - Variant ${item.variant_id}:`);
-          console.log(`   Current Stock: ${currentStock}`);
-          console.log(`   Order Quantity: ${item.quantity}`);
-          console.log(`   New Stock: ${newStock}`);
-          
-          // Check if we have enough stock
-          if (currentStock < item.quantity) {
-            console.error(`❌ Not enough stock for variant ${item.variant_id}. Available: ${currentStock}, Requested: ${item.quantity}`);
-            continue;
-          }
-          
-          const { error: updateError } = await supabase
-            .from('product_variants')
-            .update({ quantity: newStock })
-            .eq('id', item.variant_id);
-            
-          if (updateError) {
-            console.error('❌ Error deducting stock:', updateError);
-          } else {
-            console.log(`✅ Successfully deducted ${item.quantity} units for variant ${item.variant_id}`);
-          }
-        } else {
-          console.log(`⚠️ No variant_id for product_id ${item.product_id}`);
+        if (itemsError) {
+          console.error('❌ Error fetching order items:', itemsError);
+          return;
         }
-      }
-      
-      console.log(`✅ Immediate stock deduction completed for order ${orderId}`);
-    } catch (error) {
-      console.error('❌ Error in deductStockImmediately:', error);
-    }
-  };
 
-  // Real-time orders notification
+        console.log('📦 Processing order items for immediate stock deduction:', orderItems);
+
+        // Deduct stock for each item
+        for (const item of orderItems || []) {
+          if (item.variant_id && item.product_variants) {
+            const currentStock = item.product_variants.quantity || 0;
+            const newStock = currentStock - item.quantity;
+
+            console.log(`📊 Product ${item.product_id} - Variant ${item.variant_id}:`);
+            console.log(`   Current Stock: ${currentStock}`);
+            console.log(`   Order Quantity: ${item.quantity}`);
+            console.log(`   New Stock: ${newStock}`);
+
+            // Check if we have enough stock
+            if (currentStock < item.quantity) {
+              console.error(`❌ Not enough stock for variant ${item.variant_id}. Available: ${currentStock}, Requested: ${item.quantity}`);
+              continue;
+            }
+
+            const { error: updateError } = await supabase
+              .from('product_variants')
+              .update({ quantity: newStock })
+              .eq('id', item.variant_id);
+
+            if (updateError) {
+              console.error('❌ Error deducting stock:', updateError);
+            } else {
+              console.log(`✅ Successfully deducted ${item.quantity} units for variant ${item.variant_id}`);
+            }
+          } else {
+            console.log(`⚠️ No variant_id for product_id ${item.product_id}`);
+          }
+        }
+
+        console.log(`✅ Immediate stock deduction completed for order ${orderId}`);
+      } catch (error) {
+        console.error('❌ Error in deductStockImmediately:', error);
+      }
+    };
+
+    // Real-time orders notification
     const channel = supabase
       .channel('public:orders')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: { new: { id: number; first_name: string; last_name: string; total_amount: number } }) => {
@@ -154,12 +154,12 @@ export default function App() {
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification("طلب جديد! 📦", {
             body: `وصل طلب من ${order.first_name} ${order.last_name} بمبلغ ${formatCurrency(order.total_amount)}`,
-            icon: "/favicon.ico"
+            icon: "https://res.cloudinary.com/dlwuxgvse/image/upload/v1772299278/580996199_18082640534081883_3315094757438837248_n_wwtp2p.jpg"
           });
         }
 
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-        audio.play().catch(() => {});
+        const audio = new Audio('https://res.cloudinary.com/dlwuxgvse/video/upload/v1772274343/6GYhcxV_rSI_eohbgv.mp3');
+        audio.play().catch(() => { });
       })
       .subscribe();
 
@@ -173,7 +173,7 @@ export default function App() {
       {/* Mobile Backdrop */}
       <AnimatePresence>
         {isMobile && isSidebarOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -184,18 +184,22 @@ export default function App() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "bg-brand-black text-brand-white transition-all duration-300 ease-in-out flex flex-col z-[70]",
-          isMobile 
+          isMobile
             ? cn("fixed inset-y-0 right-0 w-64 transform", isSidebarOpen ? "translate-x-0" : "translate-x-full")
             : cn("relative", isSidebarOpen ? "w-64" : "w-20")
         )}
       >
         <div className="p-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand-white rounded-lg flex items-center justify-center">
-              <span className="text-brand-black font-bold text-xl">Y</span>
+            <div className="w-10 h-10 overflow-hidden rounded-xl border-2 border-brand-white/20 flex items-center justify-center bg-brand-white/10">
+              <img
+                src="https://res.cloudinary.com/dlwuxgvse/image/upload/v1772299278/580996199_18082640534081883_3315094757438837248_n_wwtp2p.jpg"
+                alt="Logo"
+                className="w-full h-full object-cover"
+              />
             </div>
             {(isSidebarOpen || isMobile) && <span className="font-serif text-xl font-bold tracking-tighter">يور تيشيرت DZ</span>}
           </Link>
@@ -216,15 +220,15 @@ export default function App() {
                 to={item.path}
                 className={cn(
                   "flex items-center gap-4 px-4 py-3 rounded-xl transition-all group",
-                  isActive 
-                    ? "bg-brand-white text-brand-black" 
+                  isActive
+                    ? "bg-brand-white text-brand-black"
                     : "text-brand-white/60 hover:bg-brand-white/10 hover:text-brand-white"
                 )}
               >
                 <Icon size={20} className={cn(isActive ? "text-brand-black" : "group-hover:scale-110 transition-transform")} />
                 {(isSidebarOpen || isMobile) && <span className="font-medium">{item.name}</span>}
                 {isActive && (isSidebarOpen || isMobile) && (
-                  <motion.div 
+                  <motion.div
                     layoutId="activeNav"
                     className="mr-auto"
                   >
@@ -249,18 +253,18 @@ export default function App() {
         {/* Header */}
         <header className="h-20 border-b border-brand-border flex items-center justify-between px-4 sm:px-8 bg-white/50 backdrop-blur-sm z-40">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 hover:bg-brand-gray rounded-lg transition-colors"
             >
               <Menu size={20} />
             </button>
-            <h2 className="font-serif text-lg font-bold sm:hidden">يور تيشيرت</h2>
+            <h2 className="font-serif text-base sm:text-lg font-bold sm:hidden truncate max-w-[120px]">يور تيشيرت</h2>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-6">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className={cn(
                   "p-2 hover:bg-brand-gray rounded-lg transition-colors relative",
@@ -278,25 +282,32 @@ export default function App() {
               <AnimatePresence>
                 {showNotifications && (
                   <>
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       onClick={() => setShowNotifications(false)}
                       className="fixed inset-0 z-[45]"
                     />
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       className="absolute left-0 mt-2 w-80 bg-brand-white rounded-2xl shadow-2xl border border-brand-border z-[50] overflow-hidden"
                     >
                       <div className="p-4 border-b border-brand-border flex items-center justify-between bg-brand-gray/30">
-                        <h3 className="font-bold text-sm">الإشعارات</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-sm">الإشعارات</h3>
+                          {notifications.length > 0 && (
+                            <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+                              {notifications.length} جديد
+                            </span>
+                          )}
+                        </div>
                         {notifications.length > 0 && (
-                          <button 
+                          <button
                             onClick={() => setNotifications([])}
-                            className="text-[10px] font-bold text-brand-black/40 hover:text-brand-black transition-colors"
+                            className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors bg-red-50 px-2 py-1 rounded-md"
                           >
                             مسح الكل
                           </button>
@@ -306,28 +317,31 @@ export default function App() {
                         {notifications.length > 0 ? (
                           <div className="divide-y divide-brand-border">
                             {notifications.map((notif, i) => (
-                              <div 
-                                key={notif.id ?? i} 
+                              <div
+                                key={notif.id ?? i}
                                 className="p-4 hover:bg-brand-gray/20 transition-colors cursor-pointer"
                                 onClick={() => {
                                   // Navigate to specific order with notification highlight
                                   navigate(`/orders?order=${notif.id}&highlight=true`);
                                   setShowNotifications(false);
-                                  
+
                                   // Remove this notification from the list
                                   setNotifications(prev => prev.filter(n => (n.id ?? i) !== (notif.id ?? i)));
                                 }}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 bg-brand-black text-brand-white rounded-full flex items-center justify-center text-[10px] font-bold">
-                                    {notif.first_name?.[0]}{notif.last_name?.[0]}
+                                  <div className="relative">
+                                    <div className="w-10 h-10 bg-brand-black text-brand-white rounded-xl flex items-center justify-center text-xs font-bold shadow-lg">
+                                      {notif.first_name?.[0]}{notif.last_name?.[0]}
+                                    </div>
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold truncate">طلب جديد من {notif.first_name} {notif.last_name}</p>
-                                    <p className="text-[10px] text-brand-black/50 mt-0.5">بمبلغ {formatCurrency(notif.total_amount)}</p>
+                                    <p className="text-sm font-bold truncate text-brand-black">طلب جديد من {notif.first_name} {notif.last_name}</p>
+                                    <p className="text-xs text-brand-black/60 mt-0.5 font-medium">بمبلغ <span className="text-emerald-600">{formatCurrency(notif.total_amount)}</span></p>
                                   </div>
-                                  <div className="text-[10px] text-brand-black/30">
-                                    {notif.created_at 
+                                  <div className="text-[10px] font-bold text-brand-black/30 bg-brand-gray px-1.5 py-0.5 rounded-full">
+                                    {notif.created_at
                                       ? new Date(notif.created_at).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })
                                       : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </div>
@@ -345,8 +359,8 @@ export default function App() {
                         )}
                       </div>
                       {notifications.length > 0 && (
-                        <Link 
-                          to="/orders" 
+                        <Link
+                          to="/orders"
                           onClick={() => setShowNotifications(false)}
                           className="block p-3 text-center text-[10px] font-bold bg-brand-black text-brand-white hover:bg-brand-black/90 transition-colors"
                         >
@@ -358,13 +372,13 @@ export default function App() {
                 )}
               </AnimatePresence>
             </div>
-            
-            <div className="flex items-center gap-3 pr-3 sm:pr-6 border-r border-brand-border">
-              <div className="text-right hidden sm:block">
+
+            <div className="flex items-center gap-2 sm:gap-3 pr-2 sm:pr-6 border-r border-brand-border h-10">
+              <div className="text-right hidden md:block">
                 <p className="text-sm font-bold">المسؤول</p>
                 <p className="text-xs text-brand-black/50">مدير المتجر</p>
               </div>
-              <div className="w-10 h-10 bg-brand-black rounded-full flex items-center justify-center text-brand-white font-bold">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-brand-black rounded-full flex items-center justify-center text-brand-white font-bold shrink-0">
                 A
               </div>
             </div>
