@@ -17,7 +17,8 @@ import {
   Trash2,
   ArrowRight,
   AlertCircle,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -825,4 +826,4 @@ export default function Orders() {
   );
 }
 
-import { Users } from 'lucide-react';
+

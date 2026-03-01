@@ -342,188 +342,197 @@ export default function Locations() {
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Baladiyas Detail */}
-          <div className="space-y-4">
-            {selectedWilaya ? (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="glass-card p-6 h-full flex flex-col"
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold">{selectedWilaya.name_ar}</h3>
-                    <p className="text-brand-black/50 text-sm">قائمة البلديات</p>
-                  </div>
-                  <div className="p-3 bg-brand-black text-brand-white rounded-xl">
-                    <MapPin size={20} />
-                  </div>
-                </div>
+        {/* Floating Action Button (Mobile Only) */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="fixed bottom-6 left-6 w-14 h-14 bg-brand-black text-brand-white rounded-full shadow-2xl flex items-center justify-center z-[60] sm:hidden active:scale-90 transition-transform"
+        >
+          <Plus size={28} />
+        </button>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {baladiyas.map((baladiya) => (
-                    <div key={baladiya.id} className="p-3 bg-brand-gray/50 rounded-xl flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-sm">{baladiya.name_ar}</p>
-                        <p className="text-xs text-brand-black/40 font-serif">{baladiya.name_en || 'N/A'}</p>
-                      </div>
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        baladiya.active ? "bg-emerald-500" : "bg-brand-black/20"
-                      )} />
-                    </div>
-                  ))}
-                  {baladiyas.length === 0 && (
-                    <p className="text-center text-brand-black/30 py-12">لم يتم العثور على بلديات لهذه الولاية.</p>
-                  )}
-                </div>
-              </motion.div>
-            ) : (
-              <div className="glass-card p-12 flex flex-col items-center justify-center text-center space-y-4 h-full">
-                <div className="w-16 h-16 bg-brand-gray rounded-full flex items-center justify-center text-brand-black/20">
-                  <MapPin size={32} />
-                </div>
+        {/* Baladiyas Detail */}
+        <div className="space-y-4">
+          {selectedWilaya ? (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="glass-card p-6 h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="font-bold">اختر ولاية</p>
-                  <p className="text-sm text-brand-black/40">انقر على ولاية لرؤية البلديات التابعة لها وإدارة الإعدادات الخاصة بها.</p>
+                  <h3 className="text-xl font-bold">{selectedWilaya.name_ar}</h3>
+                  <p className="text-brand-black/50 text-sm">قائمة البلديات</p>
+                </div>
+                <div className="p-3 bg-brand-black text-brand-white rounded-xl">
+                  <MapPin size={20} />
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-        {/* Add Wilaya Modal */}
-        <AnimatePresence>
-          {showAddModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowAddModal(false)}
-                className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative w-full max-w-lg bg-brand-white rounded-3xl shadow-2xl overflow-hidden border border-brand-border"
-              >
-                <div className="p-6 border-b border-brand-border flex items-center justify-between bg-brand-gray/50">
-                  <div>
-                    <h3 className="text-xl font-bold">إضافة ولاية جديدة</h3>
-                    <p className="text-xs text-brand-black/50 mt-1">أدخل بيانات الولاية الجديدة لإضافتها إلى القائمة.</p>
-                  </div>
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="p-2 hover:bg-brand-gray rounded-xl transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
 
-                <form onSubmit={handleAddWilaya} className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-brand-black/60 px-1">كود الولاية (مثلاً 01)</label>
-                      <input
-                        type="text"
-                        required
-                        className="input-field"
-                        placeholder="01"
-                        value={newWilaya.code}
-                        onChange={e => setNewWilaya({ ...newWilaya, code: e.target.value })}
-                      />
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {baladiyas.map((baladiya) => (
+                  <div key={baladiya.id} className="p-3 bg-brand-gray/50 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-sm">{baladiya.name_ar}</p>
+                      <p className="text-xs text-brand-black/40 font-serif">{baladiya.name_en || 'N/A'}</p>
                     </div>
-                    <div className="space-y-1.5 flex items-end pb-3">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 accent-brand-black rounded-lg"
-                          checked={newWilaya.active}
-                          onChange={e => setNewWilaya({ ...newWilaya, active: e.target.checked })}
-                        />
-                        <span className="text-sm font-bold">نشطة</span>
-                      </label>
-                    </div>
+                    <div className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      baladiya.active ? "bg-emerald-500" : "bg-brand-black/20"
+                    )} />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (عربي)</label>
-                      <input
-                        type="text"
-                        required
-                        className="input-field"
-                        placeholder="أدرار"
-                        value={newWilaya.name_ar}
-                        onChange={e => setNewWilaya({ ...newWilaya, name_ar: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (EN)</label>
-                      <input
-                        type="text"
-                        required
-                        className="input-field"
-                        placeholder="Adrar"
-                        value={newWilaya.name_en}
-                        onChange={e => setNewWilaya({ ...newWilaya, name_en: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمنزل</label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          required
-                          className="input-field"
-                          placeholder="800"
-                          value={newWilaya.delivery_price_home || ''}
-                          onChange={e => setNewWilaya({ ...newWilaya, delivery_price_home: parseFloat(e.target.value) || 0 })}
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمكتب</label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          required
-                          className="input-field"
-                          placeholder="400"
-                          value={newWilaya.delivery_price_desk || ''}
-                          onChange={e => setNewWilaya({ ...newWilaya, delivery_price_desk: parseFloat(e.target.value) || 0 })}
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <button
-                      type="submit"
-                      className="flex-1 py-4 bg-brand-black text-brand-white rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
-                    >
-                      حفظ الولاية
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddModal(false)}
-                      className="px-8 py-4 bg-brand-gray text-brand-black rounded-2xl font-bold hover:bg-brand-gray/80 transition-all"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
+                ))}
+                {baladiyas.length === 0 && (
+                  <p className="text-center text-brand-black/30 py-12">لم يتم العثور على بلديات لهذه الولاية.</p>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <div className="glass-card p-12 flex flex-col items-center justify-center text-center space-y-4 h-full">
+              <div className="w-16 h-16 bg-brand-gray rounded-full flex items-center justify-center text-brand-black/20">
+                <MapPin size={32} />
+              </div>
+              <div>
+                <p className="font-bold">اختر ولاية</p>
+                <p className="text-sm text-brand-black/40">انقر على ولاية لرؤية البلديات التابعة لها وإدارة الإعدادات الخاصة بها.</p>
+              </div>
             </div>
           )}
-        </AnimatePresence>
+        </div>
+      </div>
+      {/* Add Wilaya Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddModal(false)}
+              className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-brand-white rounded-3xl shadow-2xl overflow-hidden border border-brand-border"
+            >
+              <div className="p-6 border-b border-brand-border flex items-center justify-between bg-brand-gray/50">
+                <div>
+                  <h3 className="text-xl font-bold">إضافة ولاية جديدة</h3>
+                  <p className="text-xs text-brand-black/50 mt-1">أدخل بيانات الولاية الجديدة لإضافتها إلى القائمة.</p>
+                </div>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="p-2 hover:bg-brand-gray rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddWilaya} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-brand-black/60 px-1">كود الولاية (مثلاً 01)</label>
+                    <input
+                      type="text"
+                      required
+                      className="input-field"
+                      placeholder="01"
+                      value={newWilaya.code}
+                      onChange={e => setNewWilaya({ ...newWilaya, code: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5 flex items-end pb-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="w-5 h-5 accent-brand-black rounded-lg"
+                        checked={newWilaya.active}
+                        onChange={e => setNewWilaya({ ...newWilaya, active: e.target.checked })}
+                      />
+                      <span className="text-sm font-bold">نشطة</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (عربي)</label>
+                    <input
+                      type="text"
+                      required
+                      className="input-field"
+                      placeholder="أدرار"
+                      value={newWilaya.name_ar}
+                      onChange={e => setNewWilaya({ ...newWilaya, name_ar: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (EN)</label>
+                    <input
+                      type="text"
+                      required
+                      className="input-field"
+                      placeholder="Adrar"
+                      value={newWilaya.name_en}
+                      onChange={e => setNewWilaya({ ...newWilaya, name_en: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمنزل</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        className="input-field"
+                        placeholder="800"
+                        value={newWilaya.delivery_price_home || ''}
+                        onChange={e => setNewWilaya({ ...newWilaya, delivery_price_home: parseFloat(e.target.value) || 0 })}
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمكتب</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required
+                        className="input-field"
+                        placeholder="400"
+                        value={newWilaya.delivery_price_desk || ''}
+                        onChange={e => setNewWilaya({ ...newWilaya, delivery_price_desk: parseFloat(e.target.value) || 0 })}
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button
+                    type="submit"
+                    className="flex-1 py-4 bg-brand-black text-brand-white rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
+                  >
+                    حفظ الولاية
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-8 py-4 bg-brand-gray text-brand-black rounded-2xl font-bold hover:bg-brand-gray/80 transition-all"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div >
   );
 }
