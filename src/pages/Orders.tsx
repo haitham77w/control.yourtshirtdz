@@ -568,9 +568,25 @@ export default function Orders() {
         </div>
 
         {filteredOrders.length === 0 && !loading && (
-          <div className="p-12 text-center text-brand-black/40">
-            لم يتم العثور على طلبات.
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-20 text-center flex flex-col items-center justify-center space-y-4"
+          >
+            <div className="w-20 h-20 bg-brand-gray rounded-full flex items-center justify-center text-brand-black/10">
+              <ShoppingBag size={40} />
+            </div>
+            <div>
+              <p className="text-lg font-bold">لا توجد طلبات</p>
+              <p className="text-sm text-brand-black/40 max-w-xs mx-auto">لم نتمكن من العثور على أي طلبات في هذا القسم حالياً.</p>
+            </div>
+            <button
+              onClick={() => setSearchParams({})}
+              className="btn-secondary text-xs py-2 px-6"
+            >
+              إعادة تعيين الفلاتر
+            </button>
+          </motion.div>
         )}
       </div>
 

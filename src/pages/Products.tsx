@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Edit2, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Edit2,
+  Trash2,
   Eye,
   Star,
   Image as ImageIcon,
   Check,
   X,
-  ChevronDown
+  ChevronDown,
+  Copy,
+  Package
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -67,12 +69,17 @@ export default function Products() {
     }
   }
 
-  const handleOpenModal = (product: Product | null = null) => {
+  const handleOpenModal = (product: Product | null = null, isDuplicate = false) => {
     if (product) {
-      setEditingProduct(product);
+      if (!isDuplicate) {
+        setEditingProduct(product);
+      } else {
+        setEditingProduct(null);
+      }
+
       setFormData({
-        name_ar: product.name_ar,
-        name_en: product.name_en,
+        name_ar: isDuplicate ? `${product.name_ar} (نسخة)` : product.name_ar,
+        name_en: isDuplicate ? `${product.name_en} (Copy)` : product.name_en,
         description_ar: product.description_ar || '',
         description_en: product.description_en || '',
         price: product.price.toString(),
@@ -84,7 +91,8 @@ export default function Products() {
       const vList = product.variants || (product as any).product_variants || [];
       setVariants(
         vList.map((v: ProductVariant) => ({
-          id: v.id,
+          // id should not be copied if duplicating
+          ...(isDuplicate ? {} : { id: v.id }),
           size: v.size || '',
           color: v.color || '',
           quantity: v.quantity.toString()
@@ -221,9 +229,9 @@ export default function Products() {
         .from('products')
         .update({ is_featured: newFeaturedStatus })
         .eq('id', product.id);
-      
+
       if (error) throw error;
-      
+
       fetchData();
     } catch (error) {
       console.error('Error toggling featured status:', error);
@@ -272,13 +280,13 @@ export default function Products() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
+  const filteredProducts = products.filter(p =>
     p.name_ar.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.name_en.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-8"
@@ -288,7 +296,7 @@ export default function Products() {
           <h1 className="text-4xl font-bold">المنتجات</h1>
           <p className="text-brand-black/50 mt-1">إدارة مخزون المتجر والمتغيرات.</p>
         </div>
-        <button 
+        <button
           onClick={() => handleOpenModal()}
           className="btn-primary flex items-center justify-center gap-2"
         >
@@ -301,9 +309,9 @@ export default function Products() {
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-black/30" size={20} />
-          <input 
-            type="text" 
-            placeholder="البحث عن المنتجات..." 
+          <input
+            type="text"
+            placeholder="البحث عن المنتجات..."
             className="input-field pr-12"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -370,11 +378,27 @@ export default function Products() {
                   </td>
                   <td className="p-6 hidden sm:table-cell">
                     <div className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
-                      product.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                      "inline-flex flex-col gap-1"
                     )}>
-                      {product.is_active ? <Check size={12} /> : <X size={12} />}
-                      {product.is_active ? 'نشط' : 'غير نشط'}
+                      <div className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
+                        product.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                      )}>
+                        {product.is_active ? <Check size={12} /> : <X size={12} />}
+                        {product.is_active ? 'نشط' : 'غير نشط'}
+                      </div>
+                      {(() => {
+                        const totalStock = (product.variants || (product as any).product_variants || [])?.reduce((acc: number, v: any) => acc + (v.quantity || 0), 0);
+                        return (
+                          <div className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-md text-center",
+                            totalStock === 0 ? "bg-rose-100 text-rose-700" :
+                              totalStock < 10 ? "bg-amber-100 text-amber-700" : "bg-brand-gray text-brand-black/40"
+                          )}>
+                            {totalStock === 0 ? 'نفذ المخزون' : totalStock < 10 ? `مخزون منخفض (${totalStock})` : `متوفر (${totalStock})`}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="p-6 text-sm text-brand-black/50 hidden lg:table-cell">
@@ -382,26 +406,33 @@ export default function Products() {
                   </td>
                   <td className="p-6 text-left">
                     <div className="flex items-center justify-start gap-2">
-                      <button 
+                      <button
                         onClick={() => handleOpenModal(product)}
                         className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
                         title="تعديل المنتج"
                       >
                         <Edit2 size={16} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => toggleFeatured(product)}
                         className={cn(
                           "p-2 rounded-lg transition-all",
-                          product.is_featured 
-                            ? "bg-amber-500 text-brand-white hover:bg-amber-600" 
+                          product.is_featured
+                            ? "bg-amber-500 text-brand-white hover:bg-amber-600"
                             : "hover:bg-brand-black hover:text-brand-white"
                         )}
                         title={product.is_featured ? "إلغاء التمييز" : "جعل المنتج مميزاً"}
                       >
                         <Star size={16} />
                       </button>
-                      <button 
+                      <button
+                        onClick={() => handleOpenModal(product, true)}
+                        className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
+                        title="نسخ المنتج"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
                         onClick={() => handleDelete(product.id)}
                         className="p-2 hover:bg-rose-500 hover:text-brand-white rounded-lg transition-all"
                         title="حذف المنتج"
@@ -414,8 +445,26 @@ export default function Products() {
               ))}
               {filteredProducts.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-brand-black/40">
-                    لم يتم العثور على منتجات.
+                  <td colSpan={6} className="p-20 text-center">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center justify-center space-y-4"
+                    >
+                      <div className="w-20 h-20 bg-brand-gray rounded-full flex items-center justify-center text-brand-black/10">
+                        <Package size={40} />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold">لا توجد منتجات عارضة</p>
+                        <p className="text-sm text-brand-black/40 max-w-xs mx-auto">لم نجد أي منتجات تطابق بحثك. حاول تغيير كلمة البحث أو إضافة منتج جديد.</p>
+                      </div>
+                      <button
+                        onClick={() => handleOpenModal()}
+                        className="btn-secondary text-xs py-2 px-6"
+                      >
+                        إضافة أول منتج
+                      </button>
+                    </motion.div>
                   </td>
                 </tr>
               )}
@@ -428,14 +477,14 @@ export default function Products() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
               className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -447,28 +496,28 @@ export default function Products() {
                   <X size={20} />
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold">الاسم (بالعربية)</label>
-                    <input 
+                    <input
                       required
                       dir="rtl"
-                      type="text" 
-                      className="input-field" 
+                      type="text"
+                      className="input-field"
                       value={formData.name_ar}
-                      onChange={e => setFormData({...formData, name_ar: e.target.value})}
+                      onChange={e => setFormData({ ...formData, name_ar: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
-                    <input 
+                    <input
                       required
-                      type="text" 
-                      className="input-field" 
+                      type="text"
+                      className="input-field"
                       value={formData.name_en}
-                      onChange={e => setFormData({...formData, name_en: e.target.value})}
+                      onChange={e => setFormData({ ...formData, name_en: e.target.value })}
                     />
                   </div>
                 </div>
@@ -476,31 +525,31 @@ export default function Products() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold">السعر (دج)</label>
-                    <input 
+                    <input
                       required
-                      type="number" 
-                      className="input-field" 
+                      type="number"
+                      className="input-field"
                       value={formData.price}
-                      onChange={e => setFormData({...formData, price: e.target.value})}
+                      onChange={e => setFormData({ ...formData, price: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold">السعر الأصلي (دج)</label>
-                    <input 
-                      type="number" 
-                      className="input-field" 
+                    <input
+                      type="number"
+                      className="input-field"
                       value={formData.original_price}
-                      onChange={e => setFormData({...formData, original_price: e.target.value})}
+                      onChange={e => setFormData({ ...formData, original_price: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold">الصنف</label>
-                  <select 
+                  <select
                     className="input-field"
                     value={formData.category_id}
-                    onChange={e => setFormData({...formData, category_id: e.target.value})}
+                    onChange={e => setFormData({ ...formData, category_id: e.target.value })}
                   >
                     <option value="">اختر الصنف</option>
                     {categories.map(cat => (
@@ -509,10 +558,10 @@ export default function Products() {
                   </select>
                 </div>
 
-                <ImageUpload 
+                <ImageUpload
                   label="صورة المنتج"
                   value={formData.image_url}
-                  onChange={url => setFormData({...formData, image_url: url})}
+                  onChange={url => setFormData({ ...formData, image_url: url })}
                 />
 
                 {/* متغيرات المنتج */}
@@ -587,30 +636,30 @@ export default function Products() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold">الوصف (بالعربية)</label>
-                    <textarea 
+                    <textarea
                       dir="rtl"
-                      className="input-field h-24 resize-none" 
+                      className="input-field h-24 resize-none"
                       value={formData.description_ar}
-                      onChange={e => setFormData({...formData, description_ar: e.target.value})}
+                      onChange={e => setFormData({ ...formData, description_ar: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold">الوصف (بالإنجليزي)</label>
-                    <textarea 
-                      className="input-field h-24 resize-none" 
+                    <textarea
+                      className="input-field h-24 resize-none"
                       value={formData.description_en}
-                      onChange={e => setFormData({...formData, description_en: e.target.value})}
+                      onChange={e => setFormData({ ...formData, description_en: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     id="is_active"
                     className="w-5 h-5 accent-brand-black"
                     checked={formData.is_active}
-                    onChange={e => setFormData({...formData, is_active: e.target.checked})}
+                    onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                   />
                   <label htmlFor="is_active" className="text-sm font-bold">المنتج نشط ومرئي للجميع</label>
                 </div>
