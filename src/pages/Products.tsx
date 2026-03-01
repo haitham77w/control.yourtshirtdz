@@ -225,12 +225,79 @@ export default function Products() {
   const toggleFeatured = async (product: Product) => {
     try {
       const newFeaturedStatus = !product.is_featured;
-      const { error } = await supabase
+
+      // 1. Update the main products table flag
+      const { error: mainUpdateErr } = await supabase
         .from('products')
         .update({ is_featured: newFeaturedStatus })
         .eq('id', product.id);
 
-      if (error) throw error;
+      if (mainUpdateErr) throw mainUpdateErr;
+
+      // 2. Synchronize with featured_products table
+      if (newFeaturedStatus) {
+        // Add to featured_products
+        const featuredPayload = {
+          id: product.id,
+          category_id: product.category_id,
+          name_ar: product.name_ar,
+          name_en: product.name_en,
+          description_ar: product.description_ar,
+          description_en: product.description_en,
+          image_url: product.image_url,
+          price: product.price,
+          original_price: product.original_price,
+        };
+
+        const { error: insErr } = await supabase
+          .from('featured_products')
+          .upsert([featuredPayload]);
+
+        if (insErr) {
+          console.error('Error adding to featured_products:', insErr);
+          // We don't necessarily want to fail the whole operation if this sync fails, 
+          // but let's notify the user if it's a hard error.
+        }
+
+        // Sync variants as well
+        const productVariants = product.variants || (product as any).product_variants || [];
+        if (productVariants.length > 0) {
+          // First, remove any existing variants for this featured product to avoid duplicates
+          await supabase
+            .from('featured_product_variants')
+            .delete()
+            .eq('featured_product_id', product.id);
+
+          const featuredVariants = productVariants.map((v: any) => ({
+            featured_product_id: product.id,
+            size: v.size,
+            color: v.color,
+            quantity: v.quantity
+          }));
+
+          const { error: vInsErr } = await supabase
+            .from('featured_product_variants')
+            .insert(featuredVariants);
+
+          if (vInsErr) console.error('Error adding featured variants:', vInsErr);
+        }
+      }
+      else {
+        // Remove from featured_products
+        // First delete variants if they exist
+        await supabase
+          .from('featured_product_variants')
+          .delete()
+          .eq('featured_product_id', product.id);
+
+        // Then delete the product
+        const { error: delErr } = await supabase
+          .from('featured_products')
+          .delete()
+          .eq('id', product.id);
+
+        if (delErr) console.error('Error removing from featured_products:', delErr);
+      }
 
       fetchData();
     } catch (error) {
