@@ -54,13 +54,21 @@ export default function Products() {
     try {
       const [
         { data: productsData },
-        { data: categoriesData }
+        { data: categoriesData },
+        { data: featuredData }
       ] = await Promise.all([
         supabase.from('products').select('*, category:categories(*), variants:product_variants(*)').order('created_at', { ascending: false }),
-        supabase.from('categories').select('*')
+        supabase.from('categories').select('*'),
+        supabase.from('featured_products').select('id')
       ]);
 
-      setProducts(productsData as any || []);
+      const featuredIds = new Set((featuredData || []).map(f => f.id));
+      const formattedProducts = (productsData as any || []).map((p: any) => ({
+        ...p,
+        is_featured: featuredIds.has(p.id)
+      }));
+
+      setProducts(formattedProducts);
       setCategories(categoriesData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -224,18 +232,9 @@ export default function Products() {
 
   const toggleFeatured = async (product: Product) => {
     try {
-      const newFeaturedStatus = !product.is_featured;
+      const isCurrentlyFeatured = product.is_featured;
 
-      // 1. Update the main products table flag
-      const { error: mainUpdateErr } = await supabase
-        .from('products')
-        .update({ is_featured: newFeaturedStatus })
-        .eq('id', product.id);
-
-      if (mainUpdateErr) throw mainUpdateErr;
-
-      // 2. Synchronize with featured_products table
-      if (newFeaturedStatus) {
+      if (!isCurrentlyFeatured) {
         // Add to featured_products
         const featuredPayload = {
           id: product.id,
@@ -253,56 +252,22 @@ export default function Products() {
           .from('featured_products')
           .upsert([featuredPayload]);
 
-        if (insErr) {
-          console.error('Error adding to featured_products:', insErr);
-          // We don't necessarily want to fail the whole operation if this sync fails, 
-          // but let's notify the user if it's a hard error.
-        }
-
-        // Sync variants as well
-        const productVariants = product.variants || (product as any).product_variants || [];
-        if (productVariants.length > 0) {
-          // First, remove any existing variants for this featured product to avoid duplicates
-          await supabase
-            .from('featured_product_variants')
-            .delete()
-            .eq('featured_product_id', product.id);
-
-          const featuredVariants = productVariants.map((v: any) => ({
-            featured_product_id: product.id,
-            size: v.size,
-            color: v.color,
-            quantity: v.quantity
-          }));
-
-          const { error: vInsErr } = await supabase
-            .from('featured_product_variants')
-            .insert(featuredVariants);
-
-          if (vInsErr) console.error('Error adding featured variants:', vInsErr);
-        }
-      }
-      else {
+        if (insErr) throw insErr;
+      } else {
         // Remove from featured_products
-        // First delete variants if they exist
-        await supabase
-          .from('featured_product_variants')
-          .delete()
-          .eq('featured_product_id', product.id);
-
-        // Then delete the product
         const { error: delErr } = await supabase
           .from('featured_products')
           .delete()
           .eq('id', product.id);
 
-        if (delErr) console.error('Error removing from featured_products:', delErr);
+        if (delErr) throw delErr;
       }
 
       fetchData();
     } catch (error) {
       console.error('Error toggling featured status:', error);
-      alert('حدث خطأ أثناء تحديث حالة المنتج المميز');
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      alert(`حدث خطأ أثناء تحديث حالة المنتج المميز: ${message}`);
     }
   };
 
