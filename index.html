@@ -1,82 +1,13 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YourTshirtDZ | Fashion Store</title>
-    <link rel="icon" type="image/jpeg" href="https://res.cloudinary.com/dua3y4qmf/image/upload/v1771684082/sjexld6rqvaqxwi1fewi.jpg" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              brand: {
-                yellow: '#FFD700', // Gold/Yellow from logo
-                black: '#111111',
-                gray: '#F5F5F5',
-              }
-            },
-            fontFamily: {
-              sans: ['Oswald', 'Cairo', 'sans-serif'], // Added Oswald as primary, Cairo for Arabic fallback
-            },
-            borderRadius: {
-              'none': '0',
-              'sm': '0.125rem',
-              DEFAULT: '0', // Default to sharp corners
-              'md': '0',
-              'lg': '0',
-              'xl': '0',
-              '2xl': '0',
-              '3xl': '0',
-              'full': '9999px', // Keep full for circles only if explicitly needed
-            },
-            animation: {
-              marquee: 'marquee 25s linear infinite',
-            },
-            keyframes: {
-              marquee: {
-                '0%': { transform: 'translateX(0%)' },
-                '100%': { transform: 'translateX(-100%)' },
-              }
-            }
-          },
-        },
-      }
-    </script>
-    <style>
-      /* Custom scrollbar for better aesthetics */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 0px; /* Sharp scrollbar */
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-      }
-      
-      /* Ensure Arabic text uses Cairo if needed overrides */
-      :lang(ar) {
-        font-family: 'Cairo', 'Oswald', sans-serif;
-      }
-
-      /* Reverse marquee for RTL */
-      :lang(ar) .animate-marquee {
-        animation-direction: reverse;
-      }
-    </style>
-    <link rel="stylesheet" href="/index.css">
+    <title>YourTshirtDZ - لوحة التحكم</title>
   </head>
-  <body class="bg-white text-brand-black antialiased selection:bg-brand-yellow selection:text-black">
+  <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
+
