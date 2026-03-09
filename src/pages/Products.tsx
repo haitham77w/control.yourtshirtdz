@@ -12,14 +12,13 @@ import {
   Image as ImageIcon,
   Check,
   X,
-  ChevronDown,
-  Copy,
-  Package
+  ChevronDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
 import { Product, Category, ProductVariant } from '../types';
 import ImageUpload from '../components/ImageUpload';
+import { deleteImage } from '../lib/cloudinary';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -38,7 +37,8 @@ export default function Products() {
     price: '',
     original_price: '',
     category_id: '',
-    image_url: '',
+    images_urls: [] as string[],
+    images_public_ids: [] as string[],
     is_active: true
   });
 
@@ -54,21 +54,13 @@ export default function Products() {
     try {
       const [
         { data: productsData },
-        { data: categoriesData },
-        { data: featuredData }
+        { data: categoriesData }
       ] = await Promise.all([
         supabase.from('products').select('*, category:categories(*), variants:product_variants(*)').order('created_at', { ascending: false }),
-        supabase.from('categories').select('*'),
-        supabase.from('featured_products').select('id')
+        supabase.from('categories').select('*')
       ]);
 
-      const featuredIds = new Set((featuredData || []).map(f => f.id));
-      const formattedProducts = (productsData as any || []).map((p: any) => ({
-        ...p,
-        is_featured: featuredIds.has(p.id)
-      }));
-
-      setProducts(formattedProducts);
+      setProducts(productsData as any || []);
       setCategories(categoriesData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -77,30 +69,25 @@ export default function Products() {
     }
   }
 
-  const handleOpenModal = (product: Product | null = null, isDuplicate = false) => {
+  const handleOpenModal = (product: Product | null = null) => {
     if (product) {
-      if (!isDuplicate) {
-        setEditingProduct(product);
-      } else {
-        setEditingProduct(null);
-      }
-
+      setEditingProduct(product);
       setFormData({
-        name_ar: isDuplicate ? `${product.name_ar} (نسخة)` : product.name_ar,
-        name_en: isDuplicate ? `${product.name_en} (Copy)` : product.name_en,
+        name_ar: product.name_ar,
+        name_en: product.name_en,
         description_ar: product.description_ar || '',
         description_en: product.description_en || '',
         price: product.price.toString(),
         original_price: product.original_price?.toString() || '',
         category_id: product.category_id?.toString() || '',
-        image_url: product.image_url || '',
+        images_urls: product.images_urls || [],
+        images_public_ids: product.images_public_ids || [],
         is_active: product.is_active
       });
       const vList = product.variants || (product as any).product_variants || [];
       setVariants(
         vList.map((v: ProductVariant) => ({
-          // id should not be copied if duplicating
-          ...(isDuplicate ? {} : { id: v.id }),
+          id: v.id,
           size: v.size || '',
           color: v.color || '',
           quantity: v.quantity.toString()
@@ -116,7 +103,8 @@ export default function Products() {
         price: '',
         original_price: '',
         category_id: '',
-        image_url: '',
+        images_urls: [],
+        images_public_ids: [],
         is_active: true
       });
       setVariants([]);
@@ -140,6 +128,8 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // تجهيز البيانات للإرسال مع حذف image_url القديم إن وجد
     const payload = {
       ...formData,
       price: parseFloat(formData.price),
@@ -232,42 +222,18 @@ export default function Products() {
 
   const toggleFeatured = async (product: Product) => {
     try {
-      const isCurrentlyFeatured = product.is_featured;
+      const newFeaturedStatus = !product.is_featured;
+      const { error } = await supabase
+        .from('products')
+        .update({ is_featured: newFeaturedStatus })
+        .eq('id', product.id);
 
-      if (!isCurrentlyFeatured) {
-        // Add to featured_products
-        const featuredPayload = {
-          id: product.id,
-          category_id: product.category_id,
-          name_ar: product.name_ar,
-          name_en: product.name_en,
-          description_ar: product.description_ar,
-          description_en: product.description_en,
-          image_url: product.image_url,
-          price: product.price,
-          original_price: product.original_price,
-        };
-
-        const { error: insErr } = await supabase
-          .from('featured_products')
-          .upsert([featuredPayload]);
-
-        if (insErr) throw insErr;
-      } else {
-        // Remove from featured_products
-        const { error: delErr } = await supabase
-          .from('featured_products')
-          .delete()
-          .eq('id', product.id);
-
-        if (delErr) throw delErr;
-      }
+      if (error) throw error;
 
       fetchData();
     } catch (error) {
       console.error('Error toggling featured status:', error);
-      const message = error instanceof Error ? error.message : JSON.stringify(error);
-      alert(`حدث خطأ أثناء تحديث حالة المنتج المميز: ${message}`);
+      alert('حدث خطأ أثناء تحديث حالة المنتج المميز');
     }
   };
 
@@ -303,8 +269,20 @@ export default function Products() {
         alert(`فشل حذف المتغيرات: ${variantsErr.message}`);
         return;
       }
+      const productToDelete = products.find(p => p.id === id);
+      const publicIds = productToDelete?.images_public_ids || [];
+      const imageUrls = productToDelete?.images_urls || (productToDelete?.image_url ? [productToDelete.image_url] : []);
+
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
+
+      // حذف جميع الصور من Cloudinary
+      if (publicIds.length > 0) {
+        await Promise.all(publicIds.map(pid => deleteImage(pid)));
+      } else if (imageUrls.length > 0) {
+        await Promise.all(imageUrls.map(url => deleteImage(url)));
+      }
+
       fetchData();
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -381,7 +359,9 @@ export default function Products() {
                   <td className="p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-gray flex-shrink-0">
-                        {product.image_url ? (
+                        {product.images_urls && product.images_urls.length > 0 ? (
+                          <img src={product.images_urls[0]} alt={product.name_en} className="w-full h-full object-cover" />
+                        ) : product.image_url ? (
                           <img src={product.image_url} alt={product.name_en} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-brand-black/20">
@@ -410,27 +390,11 @@ export default function Products() {
                   </td>
                   <td className="p-6 hidden sm:table-cell">
                     <div className={cn(
-                      "inline-flex flex-col gap-1"
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
+                      product.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                     )}>
-                      <div className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
-                        product.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                      )}>
-                        {product.is_active ? <Check size={12} /> : <X size={12} />}
-                        {product.is_active ? 'نشط' : 'غير نشط'}
-                      </div>
-                      {(() => {
-                        const totalStock = (product.variants || (product as any).product_variants || [])?.reduce((acc: number, v: any) => acc + (v.quantity || 0), 0);
-                        return (
-                          <div className={cn(
-                            "text-[10px] font-bold px-2 py-0.5 rounded-md text-center",
-                            totalStock === 0 ? "bg-rose-100 text-rose-700" :
-                              totalStock < 10 ? "bg-amber-100 text-amber-700" : "bg-brand-gray text-brand-black/40"
-                          )}>
-                            {totalStock === 0 ? 'نفذ المخزون' : totalStock < 10 ? `مخزون منخفض (${totalStock})` : `متوفر (${totalStock})`}
-                          </div>
-                        );
-                      })()}
+                      {product.is_active ? <Check size={12} /> : <X size={12} />}
+                      {product.is_active ? 'نشط' : 'غير نشط'}
                     </div>
                   </td>
                   <td className="p-6 text-sm text-brand-black/50 hidden lg:table-cell">
@@ -458,13 +422,6 @@ export default function Products() {
                         <Star size={16} />
                       </button>
                       <button
-                        onClick={() => handleOpenModal(product, true)}
-                        className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
-                        title="نسخ المنتج"
-                      >
-                        <Copy size={16} />
-                      </button>
-                      <button
                         onClick={() => handleDelete(product.id)}
                         className="p-2 hover:bg-rose-500 hover:text-brand-white rounded-lg transition-all"
                         title="حذف المنتج"
@@ -477,26 +434,8 @@ export default function Products() {
               ))}
               {filteredProducts.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="p-20 text-center">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex flex-col items-center justify-center space-y-4"
-                    >
-                      <div className="w-20 h-20 bg-brand-gray rounded-full flex items-center justify-center text-brand-black/10">
-                        <Package size={40} />
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold">لا توجد منتجات عارضة</p>
-                        <p className="text-sm text-brand-black/40 max-w-xs mx-auto">لم نجد أي منتجات تطابق بحثك. حاول تغيير كلمة البحث أو إضافة منتج جديد.</p>
-                      </div>
-                      <button
-                        onClick={() => handleOpenModal()}
-                        className="btn-secondary text-xs py-2 px-6"
-                      >
-                        إضافة أول منتج
-                      </button>
-                    </motion.div>
+                  <td colSpan={6} className="p-12 text-center text-brand-black/40">
+                    لم يتم العثور على منتجات.
                   </td>
                 </tr>
               )}
@@ -591,9 +530,10 @@ export default function Products() {
                 </div>
 
                 <ImageUpload
-                  label="صورة المنتج"
-                  value={formData.image_url}
-                  onChange={url => setFormData({ ...formData, image_url: url })}
+                  label="صور المنتج"
+                  urls={formData.images_urls}
+                  publicIds={formData.images_public_ids}
+                  onChange={(urls, pids) => setFormData({ ...formData, images_urls: urls, images_public_ids: pids })}
                 />
 
                 {/* متغيرات المنتج */}

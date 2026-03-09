@@ -15,7 +15,9 @@ export interface Product {
   description_en: string | null;
   price: number;
   original_price: number | null;
-  image_url: string;
+  image_url?: string;
+  images_urls: string[];
+  images_public_ids: string[];
   is_active: boolean;
   is_featured: boolean;
   created_at: string;

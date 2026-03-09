@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Search, Edit2, Check, X, ChevronRight, Trash2, Plus } from 'lucide-react';
+import { motion } from 'motion/react';
+import { MapPin, Search, Edit2, Check, X, ChevronRight, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Wilaya, Baladiya } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
@@ -13,15 +13,6 @@ export default function Locations() {
   const [editingWilaya, setEditingWilaya] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ home: 0, desk: 0, active: true });
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newWilaya, setNewWilaya] = useState({
-    code: '',
-    name_ar: '',
-    name_en: '',
-    delivery_price_home: 0,
-    delivery_price_desk: 0,
-    active: true
-  });
 
   useEffect(() => {
     fetchWilayas();
@@ -65,29 +56,7 @@ export default function Locations() {
     }
   };
 
-  const handleAddWilaya = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { error } = await supabase.from('wilayas').insert([newWilaya]);
-      if (error) throw error;
-
-      setShowAddModal(false);
-      setNewWilaya({
-        code: '',
-        name_ar: '',
-        name_en: '',
-        delivery_price_home: 0,
-        delivery_price_desk: 0,
-        active: true
-      });
-      fetchWilayas();
-    } catch (error) {
-      console.error('Error adding wilaya:', error);
-      alert('حدث خطأ أثناء إضافة الولاية. يرجى التأكد من كود الولاية (يجب أن يكون فريداً).');
-    }
-  };
-
-  const filteredWilayas = wilayas.filter(w =>
+  const filteredWilayas = wilayas.filter(w => 
     w.name_en.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.name_ar.includes(searchTerm) ||
     w.code.includes(searchTerm)
@@ -137,24 +106,15 @@ export default function Locations() {
           <h1 className="text-4xl font-bold">الشحن والمواقع</h1>
           <p className="text-brand-black/50 mt-1">إدارة أسعار التوصيل والمناطق النشطة.</p>
         </div>
-        <div className="flex items-center gap-3">
-          {selectedIds.size > 0 && (
-            <button
-              onClick={deleteSelected}
-              className="btn-secondary flex items-center gap-2 text-rose-600 hover:bg-rose-50 border-rose-200"
-            >
-              <Trash2 size={18} />
-              <span className="hidden sm:inline">حذف المحدد ({selectedIds.size})</span>
-            </button>
-          )}
+        {selectedIds.size > 0 && (
           <button
-            onClick={() => setShowAddModal(true)}
-            className="hidden sm:flex items-center gap-2 px-6 py-3 bg-brand-black text-brand-white rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all"
+            onClick={deleteSelected}
+            className="btn-secondary flex items-center gap-2 text-rose-600 hover:bg-rose-50 border-rose-200"
           >
-            <Plus size={20} />
-            إضافة ولاية جديدة
+            <Trash2 size={18} />
+            حذف المحدد ({selectedIds.size})
           </button>
-        </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -162,9 +122,9 @@ export default function Locations() {
         <div className="lg:col-span-2 space-y-4">
           <div className="relative">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-black/30" size={20} />
-            <input
-              type="text"
-              placeholder="البحث عن ولاية..."
+            <input 
+              type="text" 
+              placeholder="البحث عن ولاية..." 
               className="input-field pr-12"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -172,8 +132,7 @@ export default function Locations() {
           </div>
 
           <div className="glass-card overflow-hidden">
-            {/* Desktop Table View */}
-            <div className="hidden sm:block overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-right border-collapse">
                 <thead>
                   <tr className="border-b border-brand-border bg-brand-gray/50">
@@ -195,8 +154,8 @@ export default function Locations() {
                 </thead>
                 <tbody className="divide-y divide-brand-border">
                   {filteredWilayas.map((wilaya) => (
-                    <tr
-                      key={wilaya.id}
+                    <tr 
+                      key={wilaya.id} 
                       onClick={() => handleWilayaClick(wilaya)}
                       className={cn(
                         "hover:bg-brand-gray/20 transition-colors cursor-pointer group",
@@ -218,11 +177,11 @@ export default function Locations() {
                       </td>
                       <td className="p-4">
                         {editingWilaya === wilaya.id ? (
-                          <input
-                            type="number"
-                            className="w-20 px-2 py-1 bg-brand-white border border-brand-border rounded"
+                          <input 
+                            type="number" 
+                            className="w-20 px-2 py-1 bg-brand-white border border-brand-border rounded" 
                             value={editForm.home}
-                            onChange={e => setEditForm({ ...editForm, home: parseFloat(e.target.value) })}
+                            onChange={e => setEditForm({...editForm, home: parseFloat(e.target.value)})}
                             onClick={e => e.stopPropagation()}
                           />
                         ) : (
@@ -231,11 +190,11 @@ export default function Locations() {
                       </td>
                       <td className="p-4 hidden md:table-cell">
                         {editingWilaya === wilaya.id ? (
-                          <input
-                            type="number"
-                            className="w-20 px-2 py-1 bg-brand-white border border-brand-border rounded"
+                          <input 
+                            type="number" 
+                            className="w-20 px-2 py-1 bg-brand-white border border-brand-border rounded" 
                             value={editForm.desk}
-                            onChange={e => setEditForm({ ...editForm, desk: parseFloat(e.target.value) })}
+                            onChange={e => setEditForm({...editForm, desk: parseFloat(e.target.value)})}
                             onClick={e => e.stopPropagation()}
                           />
                         ) : (
@@ -244,10 +203,10 @@ export default function Locations() {
                       </td>
                       <td className="p-4 hidden lg:table-cell">
                         {editingWilaya === wilaya.id ? (
-                          <input
-                            type="checkbox"
+                          <input 
+                            type="checkbox" 
                             checked={editForm.active}
-                            onChange={e => setEditForm({ ...editForm, active: e.target.checked })}
+                            onChange={e => setEditForm({...editForm, active: e.target.checked})}
                             onClick={e => e.stopPropagation()}
                           />
                         ) : (
@@ -260,13 +219,13 @@ export default function Locations() {
                       <td className="p-4 text-left">
                         {editingWilaya === wilaya.id ? (
                           <div className="flex gap-2 justify-start">
-                            <button
+                            <button 
                               onClick={(e) => { e.stopPropagation(); saveWilaya(wilaya.id); }}
                               className="p-1.5 bg-brand-black text-brand-white rounded-lg"
                             >
                               <Check size={14} />
                             </button>
-                            <button
+                            <button 
                               onClick={(e) => { e.stopPropagation(); setEditingWilaya(null); }}
                               className="p-1.5 bg-brand-gray rounded-lg"
                             >
@@ -274,7 +233,7 @@ export default function Locations() {
                             </button>
                           </div>
                         ) : (
-                          <button
+                          <button 
                             onClick={(e) => { e.stopPropagation(); startEditing(wilaya); }}
                             className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
                           >
@@ -287,75 +246,13 @@ export default function Locations() {
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile Card View */}
-            <div className="sm:hidden divide-y divide-brand-border max-h-[60vh] overflow-y-auto custom-scrollbar">
-              {filteredWilayas.map((wilaya) => (
-                <div
-                  key={wilaya.id}
-                  onClick={() => handleWilayaClick(wilaya)}
-                  className={cn(
-                    "p-4 active:bg-brand-gray/20 transition-colors",
-                    selectedWilaya?.id === wilaya.id && "bg-brand-gray/30"
-                  )}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(wilaya.id)}
-                        onChange={() => toggleSelect(wilaya.id)}
-                        onClick={e => e.stopPropagation()}
-                        className="w-5 h-5 accent-brand-black rounded-lg"
-                      />
-                      <div>
-                        <p className="font-bold text-brand-black">{wilaya.name_ar}</p>
-                        <p className="text-[10px] text-brand-black/40 font-mono">#{wilaya.code}</p>
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight",
-                      wilaya.active ? "bg-emerald-100 text-emerald-600" : "bg-brand-gray text-brand-black/40"
-                    )}>
-                      {wilaya.active ? 'نشط' : 'إيقاف'}
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs mt-3">
-                    <div className="flex gap-4">
-                      <div>
-                        <span className="text-brand-black/40 block mb-0.5">المنزل</span>
-                        <span className="font-bold">{formatCurrency(wilaya.delivery_price_home)}</span>
-                      </div>
-                      <div>
-                        <span className="text-brand-black/40 block mb-0.5">المكتب</span>
-                        <span className="font-bold">{formatCurrency(wilaya.delivery_price_desk)}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditing(wilaya); }}
-                      className="p-2.5 bg-brand-gray rounded-xl"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
-
-        {/* Floating Action Button (Mobile Only) */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="fixed bottom-6 left-6 w-14 h-14 bg-brand-black text-brand-white rounded-full shadow-2xl flex items-center justify-center z-[60] sm:hidden active:scale-90 transition-transform"
-        >
-          <Plus size={28} />
-        </button>
 
         {/* Baladiyas Detail */}
         <div className="space-y-4">
           {selectedWilaya ? (
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="glass-card p-6 h-full flex flex-col"
@@ -401,138 +298,6 @@ export default function Locations() {
           )}
         </div>
       </div>
-      {/* Add Wilaya Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowAddModal(false)}
-              className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-brand-white rounded-3xl shadow-2xl overflow-hidden border border-brand-border"
-            >
-              <div className="p-6 border-b border-brand-border flex items-center justify-between bg-brand-gray/50">
-                <div>
-                  <h3 className="text-xl font-bold">إضافة ولاية جديدة</h3>
-                  <p className="text-xs text-brand-black/50 mt-1">أدخل بيانات الولاية الجديدة لإضافتها إلى القائمة.</p>
-                </div>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="p-2 hover:bg-brand-gray rounded-xl transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddWilaya} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-brand-black/60 px-1">كود الولاية (مثلاً 01)</label>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder="01"
-                      value={newWilaya.code}
-                      onChange={e => setNewWilaya({ ...newWilaya, code: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1.5 flex items-end pb-3">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        className="w-5 h-5 accent-brand-black rounded-lg"
-                        checked={newWilaya.active}
-                        onChange={e => setNewWilaya({ ...newWilaya, active: e.target.checked })}
-                      />
-                      <span className="text-sm font-bold">نشطة</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (عربي)</label>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder="أدرار"
-                      value={newWilaya.name_ar}
-                      onChange={e => setNewWilaya({ ...newWilaya, name_ar: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-brand-black/60 px-1">اسم الولاية (EN)</label>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder="Adrar"
-                      value={newWilaya.name_en}
-                      onChange={e => setNewWilaya({ ...newWilaya, name_en: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمنزل</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        required
-                        className="input-field"
-                        placeholder="800"
-                        value={newWilaya.delivery_price_home || ''}
-                        onChange={e => setNewWilaya({ ...newWilaya, delivery_price_home: parseFloat(e.target.value) || 0 })}
-                      />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-brand-black/60 px-1">سعر التوصيل للمكتب</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        required
-                        className="input-field"
-                        placeholder="400"
-                        value={newWilaya.delivery_price_desk || ''}
-                        onChange={e => setNewWilaya({ ...newWilaya, delivery_price_desk: parseFloat(e.target.value) || 0 })}
-                      />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-black/30 pointer-events-none">دج</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="submit"
-                    className="flex-1 py-4 bg-brand-black text-brand-white rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
-                  >
-                    حفظ الولاية
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-8 py-4 bg-brand-gray text-brand-black rounded-2xl font-bold hover:bg-brand-gray/80 transition-all"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </motion.div >
+    </motion.div>
   );
 }
