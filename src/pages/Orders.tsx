@@ -62,6 +62,10 @@ export default function Orders({ showToast }: OrdersProps) {
   const orderIdFromNotification = searchParams.get('id');
   const shouldHighlight = !!orderIdFromNotification;
 
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
   const tabs = [
     { id: 'all', label: 'الكل' },
     { id: 'pending', label: 'الجديدة' },
@@ -80,7 +84,11 @@ export default function Orders({ showToast }: OrdersProps) {
           *,
           wilaya:wilayas(*),
           baladiya:baladiyas(*),
-          items:order_items(*)
+          items:order_items(
+            *,
+            product:products(*),
+            variant:product_variants(*)
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -94,50 +102,7 @@ export default function Orders({ showToast }: OrdersProps) {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
-      // Fetch product details for each order item
-      const ordersWithProducts = await Promise.all(
-        sorted.map(async (order) => {
-          const itemsWithProducts = await Promise.all(
-            (order.items || []).map(async (item) => {
-              let product = null;
-              let variant = null;
-
-              if (item.product_id) {
-                const { data: regularProduct } = await supabase
-                  .from('products')
-                  .select('*')
-                  .eq('id', item.product_id)
-                  .single();
-                product = regularProduct;
-              }
-
-              if (!product && item.product_id) {
-                const { data: featuredProduct } = await supabase
-                  .from('featured_products')
-                  .select('*')
-                  .eq('id', item.product_id)
-                  .single();
-                product = featuredProduct;
-              }
-
-              if (item.variant_id) {
-                const { data: variantData } = await supabase
-                  .from('product_variants')
-                  .select('*')
-                  .eq('id', item.variant_id)
-                  .single();
-                variant = variantData;
-              }
-
-              return { ...item, product, variant };
-            })
-          );
-
-          return { ...order, items: itemsWithProducts };
-        })
-      );
-
-      setOrders(ordersWithProducts);
+      setOrders(sorted);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
