@@ -126,3 +126,4 @@ export interface Settings {
   facebook_url: string | null;
   updated_at: string;
 }
+export type ToastType = 'success' | 'error' | 'info';

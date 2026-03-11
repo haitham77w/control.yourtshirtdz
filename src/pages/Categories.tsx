@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Edit2, Trash2, Image as ImageIcon, X, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Category } from '../types';
+import { Category, ToastType } from '../types';
 import ImageUpload from '../components/ImageUpload';
+import ConfirmModal from '../components/ConfirmModal';
 
-export default function Categories() {
+interface CategoriesProps {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+export default function Categories({ showToast }: CategoriesProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,6 +20,10 @@ export default function Categories() {
     name_en: '',
     image_url: '',
     image_public_id: ''
+  });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
+    isOpen: false,
+    category: null
   });
 
   useEffect(() => {
@@ -68,6 +77,7 @@ export default function Categories() {
       }
       setIsModalOpen(false);
       fetchCategories();
+      showToast(editingCategory ? 'تم تحديث الصنف بنجاح' : 'تم إضافة الصنف بنجاح');
     } catch (error: any) {
       console.error('Error saving category:', error);
       const msg = error.message || 'غير معروف';
@@ -90,43 +100,41 @@ export default function Categories() {
 
           setIsModalOpen(false);
           fetchCategories();
-          alert('تم الحفظ بنجاح (ملاحظة: العمود image_public_id غير موجود في قاعدة البيانات، يرجى إضافته لضمان حذف الصور نهائياً).');
+          showToast('تم الحفظ بنجاح', 'success');
           return;
         } catch (innerError: any) {
-          alert(`فشل الحفظ حتى بعد المحاولة البديلة: ${innerError.message}`);
+          showToast(`فشل الحفظ: ${innerError.message}`, 'error');
           return;
         }
       }
 
-      alert(`فشل الحفظ: ${msg}`);
+      showToast(`فشل الحفظ: ${msg}`, 'error');
     }
   };
 
   const handleDelete = async (category: Category) => {
-    if (window.confirm(`هل أنت متأكد من حذف صنف "${category.name_ar}"؟ قد يؤثر هذا على المنتجات المرتبطة به. سيتم حذف الصورة نهائياً من Cloudinary.`)) {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        // 1. Delete from Cloudinary first
-        if (category.image_public_id) {
-          const { deleteImage } = await import('../lib/cloudinary');
-          await deleteImage(category.image_public_id);
-        } else if (category.image_url) {
-          const { deleteImage } = await import('../lib/cloudinary');
-          await deleteImage(category.image_url);
-        }
-
-        // 2. Delete from Supabase
-        const { error } = await supabase.from('categories').delete().eq('id', category.id);
-        if (error) throw error;
-
-        fetchCategories();
-      } catch (error) {
-        console.error('Error deleting category:', error);
-        alert(`فشل حذف الصنف: ${error instanceof Error ? error.message : 'غير معروف'}`);
-      } finally {
-        setLoading(false);
+      // 1. Delete from Cloudinary
+      const { deleteImage } = await import('../lib/cloudinary');
+      // Use public_id if available, otherwise try to extract it from URL
+      const idToDelete = category.image_public_id || category.image_url;
+      if (idToDelete) {
+        await deleteImage(idToDelete);
       }
+
+      // 2. Delete from Supabase
+      const { error } = await supabase.from('categories').delete().eq('id', category.id);
+      if (error) throw error;
+
+      fetchCategories();
+      showToast('تم حذف الصنف بنجاح');
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      showToast(`فشل حذف الصنف: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -166,7 +174,7 @@ export default function Categories() {
                   <Edit2 size={18} />
                 </button>
                 <button
-                  onClick={() => handleDelete(category)}
+                  onClick={() => setDeleteConfirm({ isOpen: true, category })}
                   className="p-3 bg-rose-500 text-brand-white rounded-full hover:scale-110 transition-transform relative z-30"
                   type="button"
                 >
@@ -217,6 +225,16 @@ export default function Categories() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, category: null })}
+        onConfirm={() => {
+          if (deleteConfirm.category) handleDelete(deleteConfirm.category);
+        }}
+        title="حذف الصنف؟"
+        message={`هل أنت متأكد من حذف صنف "${deleteConfirm.category?.name_ar}"؟ قد يؤثر هذا على المنتجات المرتبطة به وسيتم حذف الصورة نهائياً.`}
+      />
     </motion.div>
   );
 }

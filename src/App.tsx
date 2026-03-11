@@ -16,6 +16,7 @@ import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from './lib/supabase';
 import { cn, formatCurrency } from './lib/utils';
+import Toast, { ToastType } from './components/Toast';
 
 // Pages (to be created)
 import Dashboard from './pages/Dashboard';
@@ -31,6 +32,18 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [toastOrder, setToastOrder] = useState<{ id: number; name: string; amount: number } | null>(null);
+
+  // Global Toast State
+  const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
+    message: '',
+    type: 'success',
+    isVisible: false
+  });
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type, isVisible: true });
+  };
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -436,15 +449,22 @@ export default function App() {
           <AnimatePresence mode="wait">
             <Routes location={location}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/categories" element={<Categories />} />
+              <Route path="/orders" element={<Orders showToast={showToast} />} />
+              <Route path="/products" element={<Products showToast={showToast} />} />
+              <Route path="/categories" element={<Categories showToast={showToast} />} />
               <Route path="/locations" element={<Locations />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<Settings showToast={showToast} />} />
             </Routes>
           </AnimatePresence>
         </div>
       </main>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+      />
     </div>
   );
 }

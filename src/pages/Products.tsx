@@ -18,11 +18,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
-import { Product, Category, ProductVariant } from '../types';
+import { Category, Product, ProductVariant, ToastType } from '../types';
 import ImageUpload from '../components/ImageUpload';
-import { deleteImage } from '../lib/cloudinary';
+import ConfirmModal from '../components/ConfirmModal';
 
-export default function Products() {
+interface ProductsProps {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+export default function Products({ showToast }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +47,17 @@ export default function Products() {
     category_id: '',
     images_urls: [] as string[],
     images_public_ids: [] as string[],
-    is_active: true
+    is_active: true,
+    is_featured: false
   });
 
   // متغيرات المنتج (المقاس، اللون، المخزون) - id موجود عند التعديل
   const [variants, setVariants] = useState<Array<{ id?: number; size: string; color: string; quantity: string }>>([]);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; product: Product | null }>({
+    isOpen: false,
+    product: null
+  });
 
   useEffect(() => {
     fetchData();
@@ -68,6 +78,7 @@ export default function Products() {
       setCategories(categoriesData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      showToast('فشل جلب البيانات', 'error');
     } finally {
       setLoading(false);
     }
@@ -86,7 +97,8 @@ export default function Products() {
         category_id: product.category_id?.toString() || '',
         images_urls: product.images_urls || [],
         images_public_ids: product.images_public_ids || [],
-        is_active: product.is_active
+        is_active: product.is_active,
+        is_featured: product.is_featured || false
       });
       const vList = product.variants || (product as any).product_variants || [];
       setVariants(
@@ -109,7 +121,8 @@ export default function Products() {
         category_id: '',
         images_urls: [],
         images_public_ids: [],
-        is_active: true
+        is_active: true,
+        is_featured: false
       });
       setVariants([]);
     }
@@ -144,12 +157,26 @@ export default function Products() {
     setIsModalOpen(true);
   };
 
-  const PRESET_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-  const PRESET_COLORS = ['أسود', 'أبيض', 'رمادي', 'كحلي', 'أحمر', 'أزرق', 'أخضر', 'أصفر'];
-
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<Array<{ ar: string; en: string }>>([]);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [productType, setProductType] = useState<'tshirt' | 'pants'>('tshirt');
+
+  const PRESET_SIZES = {
+    tshirt: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
+    pants: ['28', '30', '32', '34', '36', '38', '40', '42']
+  };
+
+  const PRESET_COLORS = [
+    { ar: 'أسود', en: 'Black' },
+    { ar: 'أبيض', en: 'White' },
+    { ar: 'رمادي', en: 'Grey' },
+    { ar: 'كحلي', en: 'Navy' },
+    { ar: 'أحمر', en: 'Red' },
+    { ar: 'أزرق', en: 'Blue' },
+    { ar: 'أخضر', en: 'Green' },
+    { ar: 'أصفر', en: 'Yellow' }
+  ];
 
   const generateBulkVariants = () => {
     if (selectedSizes.length === 0 && selectedColors.length === 0) return;
@@ -165,14 +192,14 @@ export default function Products() {
     // If only colors are selected
     else if (selectedSizes.length === 0 && selectedColors.length > 0) {
       selectedColors.forEach(color => {
-        newVariants.push({ size: '', color, quantity: '0' });
+        newVariants.push({ size: '', color: `${color.ar} / ${color.en}`, quantity: '0' });
       });
     }
     // If both are selected, generate combinations
     else {
       selectedSizes.forEach(size => {
         selectedColors.forEach(color => {
-          newVariants.push({ size, color, quantity: '0' });
+          newVariants.push({ size, color: `${color.ar} / ${color.en}`, quantity: '0' });
         });
       });
     }
@@ -201,7 +228,6 @@ export default function Products() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // تجهيز البيانات للإرسال مع حذف image_url القديم إن وجد
     const payload = {
       ...formData,
       price: parseFloat(formData.price),
@@ -213,10 +239,7 @@ export default function Products() {
       let productId: number;
       if (editingProduct) {
         const { error: updateErr } = await supabase.from('products').update(payload).eq('id', editingProduct.id);
-        if (updateErr) {
-          alert(`فشل تحديث المنتج: ${updateErr.message}`);
-          return;
-        }
+        if (updateErr) throw updateErr;
         productId = editingProduct.id;
 
         const validVariants = variants.filter(v => v.size.trim() || v.color.trim());
@@ -233,16 +256,10 @@ export default function Products() {
               .from('product_variants')
               .update({ size: row.size, color: row.color, quantity: row.quantity })
               .eq('id', v.id);
-            if (updErr) {
-              alert(`فشل تحديث المتغير: ${updErr.message}`);
-              return;
-            }
+            if (updErr) throw updErr;
           } else {
             const { error: insErr } = await supabase.from('product_variants').insert([row]);
-            if (insErr) {
-              alert(`فشل إضافة المتغير: ${insErr.message}`);
-              return;
-            }
+            if (insErr) throw insErr;
           }
         }
         const keptIds = validVariants.filter(v => v.id).map(v => v.id!);
@@ -257,10 +274,7 @@ export default function Products() {
         }
       } else {
         const { data: inserted, error: insErr } = await supabase.from('products').insert([payload]).select('id').single();
-        if (insErr) {
-          alert(`فشل إضافة المنتج: ${insErr.message}`);
-          return;
-        }
+        if (insErr) throw insErr;
         productId = inserted?.id;
         if (!productId) return;
 
@@ -277,18 +291,16 @@ export default function Products() {
           });
         if (variantsPayload.length > 0) {
           const { error: vErr } = await supabase.from('product_variants').insert(variantsPayload);
-          if (vErr) {
-            alert(`فشل إضافة المتغيرات: ${vErr.message}`);
-            return;
-          }
+          if (vErr) throw vErr;
         }
       }
 
       setIsModalOpen(false);
       fetchData();
-    } catch (error) {
+      showToast(editingProduct ? 'تم تحديث المنتج بنجاح' : 'تم إضافة المنتج بنجاح');
+    } catch (error: any) {
       console.error('Error saving product:', error);
-      alert(`حدث خطأ: ${error instanceof Error ? error.message : 'غير معروف'}`);
+      showToast(`حدث خطأ: ${error.message}`, 'error');
     }
   };
 
@@ -300,23 +312,21 @@ export default function Products() {
         .update({ is_featured: newFeaturedStatus })
         .eq('id', product.id);
 
-      if (error) throw error;
-
+      showToast(newFeaturedStatus ? 'تم تمييز المنتج بنجمة' : 'تم إلغاء تمييز المنتج');
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling featured status:', error);
-      alert('حدث خطأ أثناء تحديث حالة المنتج المميز');
+      showToast('حدث خطأ أثناء تحديث حالة المنتج المميز', 'error');
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المنتج؟')) return;
-
+  const handleDelete = async (product: Product) => {
     try {
+      setLoading(true);
       const { data: orderItems } = await supabase
         .from('order_items')
         .select('order_id')
-        .eq('product_id', id);
+        .eq('product_id', product.id);
 
       if (orderItems?.length) {
         const orderIds = [...new Set(orderItems.map((oi: { order_id: number }) => oi.order_id))];
@@ -326,29 +336,26 @@ export default function Products() {
           .in('id', orderIds);
         const pendingOrders = (orders || []).filter((o: { status: string }) => o.status === 'pending');
         if (pendingOrders.length > 0) {
-          alert(`يجب تأكيد حالة الطلبات المرتبطة بهذا المنتج (${pendingOrders.length} طلب قيد الانتظار) قبل الحذف.`);
+          showToast(`يجب تأكيد حالة الطلبات المرتبطة (${pendingOrders.length} طلب قيد الانتظار) قبل الحذف.`, 'error');
           return;
         }
       }
 
-      const { error: itemsErr } = await supabase.from('order_items').delete().eq('product_id', id);
-      if (itemsErr) {
-        alert(`فشل حذف بنود الطلبات: ${itemsErr.message}`);
-        return;
-      }
-      const { error: variantsErr } = await supabase.from('product_variants').delete().eq('product_id', id);
-      if (variantsErr) {
-        alert(`فشل حذف المتغيرات: ${variantsErr.message}`);
-        return;
-      }
-      const productToDelete = products.find(p => p.id === id);
-      const publicIds = productToDelete?.images_public_ids || [];
-      const imageUrls = productToDelete?.images_urls || (productToDelete?.image_url ? [productToDelete.image_url] : []);
+      // Delete from Supabase first (relational constraints might apply)
+      const { error: itemsErr } = await supabase.from('order_items').delete().eq('product_id', product.id);
+      if (itemsErr) throw itemsErr;
 
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      const { error: variantsErr } = await supabase.from('product_variants').delete().eq('product_id', product.id);
+      if (variantsErr) throw variantsErr;
+
+      const { error } = await supabase.from('products').delete().eq('id', product.id);
       if (error) throw error;
 
-      // حذف جميع الصور من Cloudinary
+      // Delete images from Cloudinary
+      const { deleteImage } = await import('../lib/cloudinary');
+      const publicIds = product.images_public_ids || [];
+      const imageUrls = product.images_urls || (product.image_url ? [product.image_url] : []);
+
       if (publicIds.length > 0) {
         await Promise.all(publicIds.map(pid => deleteImage(pid)));
       } else if (imageUrls.length > 0) {
@@ -356,9 +363,12 @@ export default function Products() {
       }
 
       fetchData();
-    } catch (error) {
+      showToast('تم حذف المنتج وكافة بياناته بنجاح');
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      alert(`فشل الحذف: ${error instanceof Error ? error.message : 'غير معروف'}`);
+      showToast(`فشل الحذف: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -559,7 +569,7 @@ export default function Products() {
                           <Star size={16} fill={product.is_featured ? "currentColor" : "none"} />
                         </button>
                         <button
-                          onClick={() => handleDelete(product.id)}
+                          onClick={() => setDeleteConfirm({ isOpen: true, product })}
                           className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
                           title="حذف"
                         >
@@ -716,9 +726,35 @@ export default function Products() {
                       >
                         <div className="p-4 bg-brand-gray/30 rounded-2xl border border-brand-border space-y-4">
                           <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider">اختر المقاسات</p>
+                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">نوع المنتج</p>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => { setProductType('tshirt'); setSelectedSizes([]); }}
+                                className={cn(
+                                  "flex-1 py-2 rounded-xl text-xs font-bold border transition-all",
+                                  productType === 'tshirt' ? "bg-brand-black text-white border-brand-black" : "bg-white text-brand-black border-brand-border"
+                                )}
+                              >
+                                تيشرت / قميص
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setProductType('pants'); setSelectedSizes([]); }}
+                                className={cn(
+                                  "flex-1 py-2 rounded-xl text-xs font-bold border transition-all",
+                                  productType === 'pants' ? "bg-brand-black text-white border-brand-black" : "bg-white text-brand-black border-brand-border"
+                                )}
+                              >
+                                سروال / بنطلون
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">اختر المقاسات ({productType === 'tshirt' ? 'حروف' : 'أرقام'})</p>
                             <div className="flex flex-wrap gap-2">
-                              {PRESET_SIZES.map(size => (
+                              {PRESET_SIZES[productType].map(size => (
                                 <button
                                   key={size}
                                   type="button"
@@ -737,21 +773,25 @@ export default function Products() {
                           </div>
 
                           <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider">اختر الألوان</p>
+                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">اختر الألوان (لغتين)</p>
                             <div className="flex flex-wrap gap-2">
                               {PRESET_COLORS.map(color => (
                                 <button
-                                  key={color}
+                                  key={color.en}
                                   type="button"
-                                  onClick={() => setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color])}
+                                  onClick={() => setSelectedColors(prev =>
+                                    prev.some(c => c.en === color.en)
+                                      ? prev.filter(c => c.en !== color.en)
+                                      : [...prev, color]
+                                  )}
                                   className={cn(
-                                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                                    selectedColors.includes(color)
+                                    "px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border",
+                                    selectedColors.some(c => c.en === color.en)
                                       ? "bg-brand-black text-white border-brand-black"
                                       : "bg-white text-brand-black border-brand-border hover:border-brand-black/30"
                                   )}
                                 >
-                                  {color}
+                                  {color.ar} / {color.en}
                                 </button>
                               ))}
                             </div>
@@ -761,7 +801,7 @@ export default function Products() {
                             type="button"
                             onClick={generateBulkVariants}
                             disabled={selectedSizes.length === 0 && selectedColors.length === 0}
-                            className="w-full py-2 bg-brand-black text-white rounded-xl text-xs font-bold hover:bg-brand-black/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-3 bg-brand-black text-white rounded-xl text-xs font-bold hover:bg-brand-black/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             توليد التشكيلات ({Math.max(1, selectedSizes.length) * Math.max(1, selectedColors.length)})
                           </button>
@@ -865,6 +905,16 @@ export default function Products() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, product: null })}
+        onConfirm={() => {
+          if (deleteConfirm.product) handleDelete(deleteConfirm.product);
+        }}
+        title="حذف المنتج؟"
+        message={`هل أنت متأكد من حذف منتج "${deleteConfirm.product?.name_ar}"؟ سيتم حذف كافة المتغيرات والصور المرتبطة به نهائياً.`}
+      />
     </motion.div>
   );
 }

@@ -17,11 +17,13 @@ import {
   Trash2,
   ArrowRight,
   AlertCircle,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
-import { Order } from '../types';
+import { Order, ToastType } from '../types';
+import ConfirmModal from '../components/ConfirmModal';
 
 const statusColors = {
   pending: "bg-amber-50 text-amber-600 border-amber-100",
@@ -39,11 +41,26 @@ const statusLabels = {
   cancelled: "ملغى",
 };
 
-export default function Orders() {
+interface OrdersProps {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+export default function Orders({ showToast }: OrdersProps) {
   const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orderId: number | null }>({
+    isOpen: false,
+    orderId: null
+  });
+
+  const orderIdFromNotification = searchParams.get('id');
+  const shouldHighlight = !!orderIdFromNotification;
 
   const tabs = [
     { id: 'all', label: 'الكل' },
@@ -128,24 +145,58 @@ export default function Orders() {
     }
   }
 
-  const handleDeleteOrder = async () => {
-    if (!selectedOrder) return;
-    if (!window.confirm(`هل أنت متأكد من حذف الطلب #${selectedOrder.id.toString().padStart(5, '0')} نهائياً؟ سيتم حذف كافة سجلات الطلب والمنتجات المرتبطة به من قاعدة البيانات.`)) return;
+  const handlePrint = () => {
+    window.print();
+  };
 
+  const handleContact = () => {
+    if (!selectedOrder) return;
+    const message = `مرحباً ${selectedOrder.first_name}، نحن من متجر "يور تيشرت" بخصوص طلبك رقم #${selectedOrder.id.toString().padStart(5, '0')}.`;
+    window.open(`https://wa.me/${selectedOrder.phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const updateStatus = async (orderId: number, newStatus: string, mode: 'normal' | 'reserved' = 'normal') => {
     setUpdatingStatus(true);
     try {
-      // Cascade delete is usually better handled by DB constraints, but we do it manually to be safe
-      const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', selectedOrder.id);
-      if (itemsErr) throw itemsErr;
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: newStatus,
+          // If we had a column for reservation mode, we'd update it here
+        })
+        .eq('id', orderId);
 
-      const { error } = await supabase.from('orders').delete().eq('id', selectedOrder.id);
       if (error) throw error;
 
-      setSelectedOrder(null);
+      showToast(`تم تحديث حالة الطلب إلى: ${statusLabels[newStatus as keyof typeof statusLabels]}`);
       fetchOrders();
-    } catch (err) {
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+      }
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      showToast('فشل تحديث الحالة', 'error');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: number) => {
+    setUpdatingStatus(true);
+    try {
+      const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', orderId);
+      if (itemsErr) throw itemsErr;
+
+      const { error } = await supabase.from('orders').delete().eq('id', orderId);
+      if (error) throw error;
+
+      showToast('تم حذف الطلب نهائياً');
+      setSelectedOrder(null);
+      setDeleteConfirm({ isOpen: false, orderId: null });
+      fetchOrders();
+    } catch (err: any) {
       console.error('Error deleting order:', err);
-      alert(`فشل حذف الطلب: ${err instanceof Error ? err.message : 'غير معروف'}`);
+      showToast(`فشل الحذف: ${err.message}`, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -532,7 +583,7 @@ export default function Orders() {
                         الاتصال بالزبون (واتساب)
                       </button>
                       <button
-                        onClick={handleDeleteOrder}
+                        onClick={() => setDeleteConfirm({ isOpen: true, orderId: selectedOrder.id })}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 hover:bg-rose-50 transition-all"
                       >
                         <Trash2 size={18} />
@@ -546,8 +597,16 @@ export default function Orders() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, orderId: null })}
+        onConfirm={() => {
+          if (deleteConfirm.orderId) handleDeleteOrder(deleteConfirm.orderId);
+        }}
+        title="حذف الطلب نهائياً؟"
+        message="هل أنت متأكد من حذف هذا الطلب؟ سيتم إزالته وكافة بياناته من النظام بشكل دائم."
+      />
     </motion.div>
   );
 }
-
-import { Users } from 'lucide-react';
