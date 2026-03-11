@@ -52,18 +52,53 @@ export default function Categories() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        name_ar: formData.name_ar,
+        name_en: formData.name_en,
+        image_url: formData.image_url,
+        image_public_id: formData.image_public_id || null
+      };
+
       if (editingCategory) {
-        const { error } = await supabase.from('categories').update(formData).eq('id', editingCategory.id);
+        const { error } = await supabase.from('categories').update(payload).eq('id', editingCategory.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('categories').insert([formData]);
+        const { error } = await supabase.from('categories').insert([payload]);
         if (error) throw error;
       }
       setIsModalOpen(false);
       fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving category:', error);
-      alert(`فشل الحفظ: ${error instanceof Error ? error.message : 'غير معروف'}`);
+      const msg = error.message || 'غير معروف';
+
+      // Fallback: Try saving without image_public_id if column doesn't exist
+      if (msg.includes('image_public_id') || msg.includes('column') || msg.includes('field')) {
+        try {
+          console.log('Retrying save without image_public_id...');
+          const fallbackPayload = {
+            name_ar: formData.name_ar,
+            name_en: formData.name_en,
+            image_url: formData.image_url
+          };
+
+          if (editingCategory) {
+            await supabase.from('categories').update(fallbackPayload).eq('id', editingCategory.id);
+          } else {
+            await supabase.from('categories').insert([fallbackPayload]);
+          }
+
+          setIsModalOpen(false);
+          fetchCategories();
+          alert('تم الحفظ بنجاح (ملاحظة: العمود image_public_id غير موجود في قاعدة البيانات، يرجى إضافته لضمان حذف الصور نهائياً).');
+          return;
+        } catch (innerError: any) {
+          alert(`فشل الحفظ حتى بعد المحاولة البديلة: ${innerError.message}`);
+          return;
+        }
+      }
+
+      alert(`فشل الحفظ: ${msg}`);
     }
   };
 
@@ -164,6 +199,7 @@ export default function Categories() {
                 </div>
                 <ImageUpload
                   label="صورة الصنف"
+                  multiple={false}
                   urls={formData.image_url ? [formData.image_url] : []}
                   publicIds={formData.image_public_id ? [formData.image_public_id] : []}
                   onChange={(urls, pids) => setFormData({

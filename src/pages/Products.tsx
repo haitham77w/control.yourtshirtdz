@@ -13,7 +13,8 @@ import {
   Check,
   X,
   ChevronDown,
-  Copy
+  Copy,
+  Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -28,6 +29,8 @@ export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'stock-asc' | 'stock-desc'>('newest');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -139,6 +142,46 @@ export default function Products() {
       }))
     );
     setIsModalOpen(true);
+  };
+
+  const PRESET_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+  const PRESET_COLORS = ['أسود', 'أبيض', 'رمادي', 'كحلي', 'أحمر', 'أزرق', 'أخضر', 'أصفر'];
+
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+
+  const generateBulkVariants = () => {
+    if (selectedSizes.length === 0 && selectedColors.length === 0) return;
+
+    const newVariants: Array<{ size: string; color: string; quantity: string }> = [];
+
+    // If only sizes are selected
+    if (selectedSizes.length > 0 && selectedColors.length === 0) {
+      selectedSizes.forEach(size => {
+        newVariants.push({ size, color: '', quantity: '0' });
+      });
+    }
+    // If only colors are selected
+    else if (selectedSizes.length === 0 && selectedColors.length > 0) {
+      selectedColors.forEach(color => {
+        newVariants.push({ size: '', color, quantity: '0' });
+      });
+    }
+    // If both are selected, generate combinations
+    else {
+      selectedSizes.forEach(size => {
+        selectedColors.forEach(color => {
+          newVariants.push({ size, color, quantity: '0' });
+        });
+      });
+    }
+
+    setVariants([...variants, ...newVariants]);
+    // Reset selections after generating
+    setSelectedSizes([]);
+    setSelectedColors([]);
+    setShowBulkAdd(false);
   };
 
   const addVariant = () => {
@@ -319,10 +362,30 @@ export default function Products() {
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name_ar.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.name_en.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products
+    .filter(p => {
+      const matchesSearch = p.name_ar.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.name_en.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = filterCategory === 'all' || p.category_id?.toString() === filterCategory;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      if (sortBy === 'price-asc') return a.price - b.price;
+      if (sortBy === 'price-desc') return b.price - a.price;
+
+      const getStock = (p: Product) => {
+        const vList = p.variants || (p as any).product_variants || [];
+        return vList.reduce((sum: number, v: ProductVariant) => sum + (v.quantity || 0), 0);
+      };
+
+      if (sortBy === 'stock-asc') return getStock(a) - getStock(b);
+      if (sortBy === 'stock-desc') return getStock(b) - getStock(a);
+
+      return 0;
+    });
 
   return (
     <motion.div
@@ -356,122 +419,164 @@ export default function Products() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2">
-            <Filter size={18} />
-            تصفية
-          </button>
-          <button className="btn-secondary flex items-center gap-2">
-            الصنف
-            <ChevronDown size={18} />
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {/* Category Filter */}
+          <div className="relative min-w-[140px]">
+            <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-black/40 pointer-events-none" size={16} />
+            <select
+              className="input-field pr-10 text-xs font-bold w-full bg-white cursor-pointer"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              <option value="all">جميع الأصناف</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id.toString()}>{cat.name_ar}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative min-w-[160px]">
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-black/40 pointer-events-none" size={16} />
+            <select
+              className="input-field pl-10 text-xs font-bold w-full bg-white cursor-pointer"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+            >
+              <option value="newest">الأحدث أولاً</option>
+              <option value="price-asc">السعر: من الأقل</option>
+              <option value="price-desc">السعر: من الأعلى</option>
+              <option value="stock-asc">المخزون: من الأقل</option>
+              <option value="stock-desc">المخزون: من الأعلى</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Products Table */}
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card overflow-hidden border border-brand-border">
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
-              <tr className="border-b border-brand-border bg-brand-gray/50">
-                <th className="p-6 font-bold text-sm text-brand-black/60">المنتج</th>
-                <th className="p-6 font-bold text-sm text-brand-black/60 hidden md:table-cell">الصنف</th>
-                <th className="p-6 font-bold text-sm text-brand-black/60">السعر</th>
-                <th className="p-6 font-bold text-sm text-brand-black/60 hidden sm:table-cell">الحالة</th>
-                <th className="p-6 font-bold text-sm text-brand-black/60 hidden lg:table-cell">تاريخ الإنشاء</th>
-                <th className="p-6 font-bold text-sm text-brand-black/60 text-left">الإجراءات</th>
+              <tr className="border-b border-brand-border bg-brand-gray/30">
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40">المنتج</th>
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40 hidden md:table-cell">الصنف</th>
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40">السعر</th>
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40 hidden sm:table-cell">المخزون</th>
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40 hidden lg:table-cell">تاريخ الإضافة</th>
+                <th className="p-5 font-bold text-[11px] uppercase tracking-wider text-brand-black/40 text-left">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="border-b border-brand-border hover:bg-brand-gray/20 transition-colors group">
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-gray flex-shrink-0">
-                        {product.images_urls && product.images_urls.length > 0 ? (
-                          <img src={product.images_urls[0]} alt={product.name_en} className="w-full h-full object-cover" />
-                        ) : product.image_url ? (
-                          <img src={product.image_url} alt={product.name_en} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-brand-black/20">
-                            <ImageIcon size={20} />
-                          </div>
+              {filteredProducts.map((product) => {
+                const productVariants = product.variants || (product as any).product_variants || [];
+                const totalStock = productVariants.reduce((sum: number, v: ProductVariant) => sum + (v.quantity || 0), 0);
+
+                const getStockBadge = (stock: number) => {
+                  if (stock === 0) return <span className="px-2 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-black border border-rose-100 flex items-center gap-1 w-fit"><X size={10} /> نفذ</span>;
+                  if (stock <= 5) return <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black border border-amber-100 flex items-center gap-1 w-fit"><Zap size={10} /> منخفض</span>;
+                  return <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black border border-emerald-100 flex items-center gap-1 w-fit"><Check size={10} /> متوفر</span>;
+                };
+
+                return (
+                  <tr key={product.id} className="border-b border-brand-border hover:bg-brand-gray/10 transition-colors group">
+                    <td className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-brand-gray/50 border border-brand-border flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                          {product.images_urls && product.images_urls.length > 0 ? (
+                            <img src={product.images_urls[0]} alt={product.name_en} className="w-full h-full object-cover" />
+                          ) : product.image_url ? (
+                            <img src={product.image_url} alt={product.name_en} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-brand-black/20">
+                              <ImageIcon size={20} />
+                            </div>
+                          )}
+                          {product.is_featured && (
+                            <div className="absolute top-1 right-1 p-1 bg-amber-400 text-white rounded-full shadow-lg">
+                              <Star size={8} fill="currentColor" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-brand-black group-hover:text-brand-black transition-colors">{product.name_ar}</p>
+                          <p className="text-[11px] text-brand-black/40 font-serif italic">{product.name_en}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-5 hidden md:table-cell">
+                      <span className="text-[10px] font-bold px-2.5 py-1 bg-brand-gray rounded-lg border border-brand-border text-brand-black/60">
+                        {product.category?.name_ar || 'غير مصنف'}
+                      </span>
+                    </td>
+                    <td className="p-5">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="font-bold text-sm text-brand-black">{formatCurrency(product.price)}</span>
+                        {product.original_price && (
+                          <span className="text-[10px] text-brand-black/30 line-through decoration-rose-500/30">
+                            {formatCurrency(product.original_price)}
+                          </span>
                         )}
                       </div>
-                      <div>
-                        <p className="font-bold text-sm">{product.name_ar}</p>
-                        <p className="text-xs text-brand-black/50 font-serif italic">{product.name_en}</p>
+                    </td>
+                    <td className="p-5 hidden sm:table-cell">
+                      <div className="flex flex-col gap-1.5">
+                        {getStockBadge(totalStock)}
+                        <span className="text-[10px] font-bold text-brand-black/40 pr-1">{totalStock} قطعة</span>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-6 hidden md:table-cell">
-                    <span className="text-sm font-medium px-3 py-1 bg-brand-gray rounded-full">
-                      {product.category?.name_ar || 'غير مصنف'}
-                    </span>
-                  </td>
-                  <td className="p-6">
-                    <div className="text-sm">
-                      <p className="font-bold">{formatCurrency(product.price)}</p>
-                      {product.original_price && (
-                        <p className="text-xs text-brand-black/40 line-through">{formatCurrency(product.original_price)}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-6 hidden sm:table-cell">
-                    <div className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
-                      product.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                    )}>
-                      {product.is_active ? <Check size={12} /> : <X size={12} />}
-                      {product.is_active ? 'نشط' : 'غير نشط'}
-                    </div>
-                  </td>
-                  <td className="p-6 text-sm text-brand-black/50 hidden lg:table-cell">
-                    {new Date(product.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="p-6 text-left">
-                    <div className="flex items-center justify-start gap-2">
-                      <button
-                        onClick={() => handleOpenModal(product)}
-                        className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
-                        title="تعديل المنتج"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleCopy(product)}
-                        className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
-                        title="نسخ المنتج"
-                      >
-                        <Copy size={16} />
-                      </button>
-                      <button
-                        onClick={() => toggleFeatured(product)}
-                        className={cn(
-                          "p-2 rounded-lg transition-all",
-                          product.is_featured
-                            ? "bg-amber-500 text-brand-white hover:bg-amber-600"
-                            : "hover:bg-brand-black hover:text-brand-white"
-                        )}
-                        title={product.is_featured ? "إلغاء التمييز" : "جعل المنتج مميزاً"}
-                      >
-                        <Star size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-2 hover:bg-rose-500 hover:text-brand-white rounded-lg transition-all"
-                        title="حذف المنتج"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="p-5 hidden lg:table-cell">
+                      <span className="text-[10px] font-bold text-brand-black/40">
+                        {new Date(product.created_at || '').toLocaleDateString('ar-DZ')}
+                      </span>
+                    </td>
+                    <td className="p-5 text-left">
+                      <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => handleCopy(product)}
+                          className="p-2.5 hover:bg-brand-black hover:text-white rounded-xl transition-all"
+                          title="نسخ المنتج"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenModal(product)}
+                          className="p-2.5 hover:bg-brand-black hover:text-white rounded-xl transition-all"
+                          title="تعديل"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => toggleFeatured(product)}
+                          className={cn(
+                            "p-2.5 rounded-xl transition-all",
+                            product.is_featured
+                              ? "bg-amber-50 text-amber-500 hover:bg-amber-100"
+                              : "hover:bg-brand-black hover:text-white"
+                          )}
+                          title={product.is_featured ? "إلغاء التمييز" : "جعل المنتج مميزاً"}
+                        >
+                          <Star size={16} fill={product.is_featured ? "currentColor" : "none"} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
+                          title="حذف"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredProducts.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-brand-black/40">
-                    لم يتم العثور على منتجات.
+                  <td colSpan={6} className="p-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-brand-black/30">
+                      <Search size={40} strokeWidth={1} />
+                      <p className="font-bold text-sm">لم يتم العثور على منتجات تطابق بحثك.</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -573,18 +678,97 @@ export default function Products() {
                 />
 
                 {/* متغيرات المنتج */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold">متغيرات المنتج (المقاس، اللون، المخزون)</label>
-                    <button
-                      type="button"
-                      onClick={addVariant}
-                      className="btn-secondary flex items-center gap-2 text-sm py-2"
-                    >
-                      <Plus size={16} />
-                      إضافة متغير
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkAdd(!showBulkAdd)}
+                        className={cn(
+                          "flex items-center gap-2 text-xs py-2 px-3 rounded-lg border transition-all",
+                          showBulkAdd
+                            ? "bg-brand-black text-white border-brand-black"
+                            : "bg-white text-brand-black border-brand-border hover:bg-brand-gray"
+                        )}
+                      >
+                        <Zap size={14} />
+                        إضافة سريعة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addVariant}
+                        className="btn-secondary flex items-center gap-2 text-xs py-2 px-3"
+                      >
+                        <Plus size={14} />
+                        إضافة يدوي
+                      </button>
+                    </div>
                   </div>
+
+                  <AnimatePresence>
+                    {showBulkAdd && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-4 bg-brand-gray/30 rounded-2xl border border-brand-border space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider">اختر المقاسات</p>
+                            <div className="flex flex-wrap gap-2">
+                              {PRESET_SIZES.map(size => (
+                                <button
+                                  key={size}
+                                  type="button"
+                                  onClick={() => setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size])}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
+                                    selectedSizes.includes(size)
+                                      ? "bg-brand-black text-white border-brand-black"
+                                      : "bg-white text-brand-black border-brand-border hover:border-brand-black/30"
+                                  )}
+                                >
+                                  {size}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider">اختر الألوان</p>
+                            <div className="flex flex-wrap gap-2">
+                              {PRESET_COLORS.map(color => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color])}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
+                                    selectedColors.includes(color)
+                                      ? "bg-brand-black text-white border-brand-black"
+                                      : "bg-white text-brand-black border-brand-border hover:border-brand-black/30"
+                                  )}
+                                >
+                                  {color}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={generateBulkVariants}
+                            disabled={selectedSizes.length === 0 && selectedColors.length === 0}
+                            className="w-full py-2 bg-brand-black text-white rounded-xl text-xs font-bold hover:bg-brand-black/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            توليد التشكيلات ({Math.max(1, selectedSizes.length) * Math.max(1, selectedColors.length)})
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   {variants.length > 0 && (
                     <div className="border border-brand-border rounded-xl overflow-hidden">
                       <div className="grid grid-cols-12 gap-2 p-3 bg-brand-gray/50 text-xs font-bold text-brand-black/60">

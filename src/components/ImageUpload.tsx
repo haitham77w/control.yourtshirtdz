@@ -8,9 +8,10 @@ interface ImageUploadProps {
   publicIds: string[];
   onChange: (urls: string[], publicIds: string[]) => void;
   label?: string;
+  multiple?: boolean;
 }
 
-export default function ImageUpload({ urls, publicIds, onChange, label }: ImageUploadProps) {
+export default function ImageUpload({ urls, publicIds, onChange, label, multiple = true }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -21,19 +22,27 @@ export default function ImageUpload({ urls, publicIds, onChange, label }: ImageU
     setUploading(true);
 
     try {
-      const newUrls = [...urls];
-      const newPublicIds = [...publicIds];
+      let newUrls = multiple ? [...urls] : [];
+      let newPublicIds = multiple ? [...publicIds] : [];
 
-      for (let i = 0; i < files.length; i++) {
-        const { url, public_id } = await uploadImage(files[i]);
-        newUrls.push(url);
-        newPublicIds.push(public_id);
+      // If not multiple, only take the first file
+      const filesToUpload = multiple ? files : [files[0]];
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const { url, public_id } = await uploadImage(filesToUpload[i] as File);
+        if (multiple) {
+          newUrls.push(url);
+          newPublicIds.push(public_id);
+        } else {
+          newUrls = [url];
+          newPublicIds = [public_id];
+        }
       }
 
       onChange(newUrls, newPublicIds);
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('فشل رفع بعض الصور. يرجى المحاولة مرة أخرى.');
+      alert('فشل رفع الصور. يرجى المحاولة مرة أخرى.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -68,32 +77,36 @@ export default function ImageUpload({ urls, publicIds, onChange, label }: ImageU
         ))}
 
         {/* زر الإضافة */}
-        <div
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          className={cn(
-            "relative aspect-square border-2 border-dashed border-brand-border rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-black group bg-brand-gray/30",
-            uploading && "cursor-wait opacity-70"
-          )}
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-2 text-brand-black/40">
-              <Loader2 size={24} className="animate-spin" />
-              <p className="text-[10px] font-bold">جاري الرفع...</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-brand-black/40 group-hover:text-brand-black transition-colors">
-              <Plus size={24} />
-              <p className="text-[10px] font-bold">إضافة صور</p>
-            </div>
-          )}
+        {(multiple || urls.length === 0) && (
+          <div
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            className={cn(
+              "relative aspect-square border-2 border-dashed border-brand-border rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-black group bg-brand-gray/30",
+              uploading && "cursor-wait opacity-70"
+            )}
+          >
+            {uploading ? (
+              <div className="flex flex-col items-center gap-2 text-brand-black/40">
+                <Loader2 size={24} className="animate-spin" />
+                <p className="text-[10px] font-bold">جاري الرفع...</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-brand-black/40 group-hover:text-brand-black transition-colors">
+                <Plus size={24} />
+                <p className="text-[10px] font-bold">
+                  {urls.length > 0 ? 'إضافة صور أخرى' : multiple ? 'إضافة صور' : 'رفع صورة'}
+                </p>
+              </div>
+            )}
 
-          {uploading && (
-            <div className="absolute bottom-2 flex items-center gap-1 text-[8px] text-brand-black/50">
-              <Zap size={8} />
-              <span>يتم الضغط تلقائياً</span>
-            </div>
-          )}
-        </div>
+            {uploading && (
+              <div className="absolute bottom-2 flex items-center gap-1 text-[8px] text-brand-black/50">
+                <Zap size={8} />
+                <span>يتم الضغط تلقائياً</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <input
@@ -101,12 +114,14 @@ export default function ImageUpload({ urls, publicIds, onChange, label }: ImageU
         ref={fileInputRef}
         className="hidden"
         accept="image/*"
-        multiple
+        multiple={multiple}
         onChange={handleFileChange}
       />
 
       <p className="text-xs text-brand-black/40">
-        يمكنك رفع عدة صور للمنتج. يتم ضغط الصور تلقائياً للحفاظ على سرعة المتجر.
+        {multiple
+          ? "يمكنك رفع عدة صور. يتم ضغط الصور تلقائياً للحفاظ على سرعة المتجر."
+          : "يرجى رفع صورة واحدة فقط. سيتم تحسينها تلقائياً."}
       </p>
     </div>
   );

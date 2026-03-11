@@ -127,12 +127,14 @@ export default function Settings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ImageUpload
               label="شعار الموقع"
+              multiple={false}
               urls={settings?.site_logo ? [settings.site_logo] : []}
               publicIds={[]}
               onChange={urls => setSettings({ ...settings!, site_logo: urls[0] || null })}
             />
             <ImageUpload
               label="الفافيكون (Favicon)"
+              multiple={false}
               urls={settings?.favicon ? [settings.favicon] : []}
               publicIds={[]}
               onChange={urls => setSettings({ ...settings!, favicon: urls[0] || null })}
