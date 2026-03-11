@@ -540,8 +540,8 @@ export default function Products({ showToast }: ProductsProps) {
                         {new Date(product.created_at || '').toLocaleDateString('ar-DZ')}
                       </span>
                     </td>
-                    <td className="p-5 text-left">
-                      <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="p-5 text-left min-w-[150px]">
+                      <div className="flex items-center justify-start gap-1">
                         <button
                           onClick={() => handleCopy(product)}
                           className="p-2.5 hover:bg-brand-black hover:text-white rounded-xl transition-all"

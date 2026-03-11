@@ -165,7 +165,7 @@ export default function Categories({ showToast }: CategoriesProps) {
                   <ImageIcon size={40} />
                 </div>
               )}
-              <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-20">
+              <div className="absolute inset-x-0 bottom-0 bg-brand-black/20 backdrop-blur-[2px] p-4 flex items-center justify-center gap-3 z-20 transition-all border-t border-white/10">
                 <button
                   onClick={() => handleOpenModal(category)}
                   className="p-3 bg-brand-white text-brand-black rounded-full hover:scale-110 transition-transform relative z-30"
