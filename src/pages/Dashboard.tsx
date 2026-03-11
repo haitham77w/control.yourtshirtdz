@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  TrendingUp, 
-  Users, 
-  ShoppingBag, 
+import {
+  TrendingUp,
+  Users,
+  ShoppingBag,
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Clock
+  Clock,
+  Plus,
+  Settings,
+  Package
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar
@@ -77,35 +80,62 @@ export default function Dashboard() {
     fetchStats();
   }, []);
 
+  const quickActions = [
+    { title: 'إضافة منتج', icon: Plus, link: '/products', color: 'bg-blue-500' },
+    { title: 'عرض الطلبات الجديدة', icon: ShoppingBag, link: '/orders?status=pending', color: 'bg-amber-500' },
+    { title: 'إعدادات الموقع', icon: Settings, link: '/settings', color: 'bg-indigo-500' },
+  ];
+
   const statCards = [
     { title: 'إجمالي الإيرادات', value: formatCurrency(stats.totalSales), icon: DollarSign, trend: '+12.5%', isUp: true },
     { title: 'إجمالي الطلبات', value: stats.totalOrders.toString(), icon: ShoppingBag, trend: '+5.2%', isUp: true },
-    { title: 'طلبات قيد الانتظار', value: stats.pendingOrders.toString(), icon: Clock, trend: '-2.1%', isUp: false },
-    { title: 'المنتجات النشطة', value: stats.activeProducts.toString(), icon: Package, trend: '+3', isUp: true },
+    { title: 'طلبات قيد الانتظار', value: stats.pendingOrders.toString(), icon: Clock, trend: stats.pendingOrders > 0 ? 'بحاجة لمراجعة' : 'لا يوجد', isUp: stats.pendingOrders === 0 },
+    { title: 'المنتجات النشطة', value: stats.activeProducts.toString(), icon: Package, trend: 'متوفر', isUp: true },
   ];
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
       className="space-y-8"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold">نظرة عامة</h1>
-          <p className="text-brand-black/50 mt-1">مرحباً بك مجدداً في لوحة تحكم YourTshirtDZ.</p>
+          <h1 className="text-3xl sm:text-4xl font-bold">لوحة التحكم</h1>
+          <p className="text-brand-black/50 mt-1">مرحباً بك مجدداً في YourTshirtDZ. إليك ما يحدث اليوم.</p>
         </div>
         <div className="flex gap-3">
           <button className="btn-secondary flex-1 sm:flex-none">تحميل التقرير</button>
-          <button className="btn-primary flex-1 sm:flex-none">آخر 30 يوم</button>
+          <button className="btn-primary flex-1 sm:flex-none flex items-center gap-2">
+            <Clock size={18} />
+            آخر 30 يوم
+          </button>
         </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {quickActions.map((action, i) => (
+          <button
+            key={action.title}
+            onClick={() => window.location.href = action.link}
+            className="glass-card p-6 flex items-center gap-4 hover:border-brand-black transition-all group group-hover:shadow-md"
+          >
+            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform", action.color)}>
+              <action.icon size={24} />
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">{action.title}</p>
+              <p className="text-sm text-brand-black/40">وصول سريع</p>
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, i) => (
-          <motion.div 
+          <motion.div
             key={stat.title}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -117,15 +147,14 @@ export default function Dashboard() {
                 <stat.icon size={20} />
               </div>
               <div className={cn(
-                "flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full",
+                "flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full",
                 stat.isUp ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
               )}>
                 {stat.trend}
-                {stat.isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
               </div>
             </div>
             <p className="text-brand-black/50 text-sm font-medium">{stat.title}</p>
-            <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
+            <h3 className="text-2xl font-bold mt-1 tracking-tight">{stat.value}</h3>
           </motion.div>
         ))}
       </div>
@@ -145,32 +174,32 @@ export default function Dashboard() {
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#000" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#000" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#000" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#000" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#999', fontSize: 12 }}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#999', fontSize: 12 }}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="sales" 
-                  stroke="#000" 
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#000"
                   strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorSales)" 
+                  fillOpacity={1}
+                  fill="url(#colorSales)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -212,4 +241,3 @@ export default function Dashboard() {
   );
 }
 
-import { Package } from 'lucide-react';

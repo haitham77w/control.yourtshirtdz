@@ -13,7 +13,8 @@ export default function Categories() {
   const [formData, setFormData] = useState({
     name_ar: '',
     name_en: '',
-    image_url: ''
+    image_url: '',
+    image_public_id: ''
   });
 
   useEffect(() => {
@@ -38,11 +39,12 @@ export default function Categories() {
       setFormData({
         name_ar: category.name_ar,
         name_en: category.name_en,
-        image_url: category.image_url
+        image_url: category.image_url || '',
+        image_public_id: category.image_public_id || ''
       });
     } else {
       setEditingCategory(null);
-      setFormData({ name_ar: '', name_en: '', image_url: '' });
+      setFormData({ name_ar: '', name_en: '', image_url: '', image_public_id: '' });
     }
     setIsModalOpen(true);
   };
@@ -51,24 +53,44 @@ export default function Categories() {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await supabase.from('categories').update(formData).eq('id', editingCategory.id);
+        const { error } = await supabase.from('categories').update(formData).eq('id', editingCategory.id);
+        if (error) throw error;
       } else {
-        await supabase.from('categories').insert([formData]);
+        const { error } = await supabase.from('categories').insert([formData]);
+        if (error) throw error;
       }
       setIsModalOpen(false);
       fetchCategories();
     } catch (error) {
       console.error('Error saving category:', error);
+      alert(`فشل الحفظ: ${error instanceof Error ? error.message : 'غير معروف'}`);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure? This may affect products in this category.')) {
+  const handleDelete = async (category: Category) => {
+    if (window.confirm(`هل أنت متأكد من حذف صنف "${category.name_ar}"؟ قد يؤثر هذا على المنتجات المرتبطة به. سيتم حذف الصورة نهائياً من Cloudinary.`)) {
       try {
-        await supabase.from('categories').delete().eq('id', id);
+        setLoading(true);
+
+        // 1. Delete from Cloudinary first
+        if (category.image_public_id) {
+          const { deleteImage } = await import('../lib/cloudinary');
+          await deleteImage(category.image_public_id);
+        } else if (category.image_url) {
+          const { deleteImage } = await import('../lib/cloudinary');
+          await deleteImage(category.image_url);
+        }
+
+        // 2. Delete from Supabase
+        const { error } = await supabase.from('categories').delete().eq('id', category.id);
+        if (error) throw error;
+
         fetchCategories();
       } catch (error) {
         console.error('Error deleting category:', error);
+        alert(`فشل حذف الصنف: ${error instanceof Error ? error.message : 'غير معروف'}`);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -100,16 +122,18 @@ export default function Categories() {
                   <ImageIcon size={40} />
                 </div>
               )}
-              <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+              <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-20">
                 <button
                   onClick={() => handleOpenModal(category)}
-                  className="p-3 bg-brand-white text-brand-black rounded-full hover:scale-110 transition-transform"
+                  className="p-3 bg-brand-white text-brand-black rounded-full hover:scale-110 transition-transform relative z-30"
+                  type="button"
                 >
                   <Edit2 size={18} />
                 </button>
                 <button
-                  onClick={() => handleDelete(category.id)}
-                  className="p-3 bg-rose-500 text-brand-white rounded-full hover:scale-110 transition-transform"
+                  onClick={() => handleDelete(category)}
+                  className="p-3 bg-rose-500 text-brand-white rounded-full hover:scale-110 transition-transform relative z-30"
+                  type="button"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -141,8 +165,12 @@ export default function Categories() {
                 <ImageUpload
                   label="صورة الصنف"
                   urls={formData.image_url ? [formData.image_url] : []}
-                  publicIds={[]}
-                  onChange={urls => setFormData({ ...formData, image_url: urls[0] || '' })}
+                  publicIds={formData.image_public_id ? [formData.image_public_id] : []}
+                  onChange={(urls, pids) => setFormData({
+                    ...formData,
+                    image_url: urls[0] || '',
+                    image_public_id: pids[0] || ''
+                  })}
                 />
                 <div className="pt-4 flex gap-3">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary flex-1">إلغاء</button>

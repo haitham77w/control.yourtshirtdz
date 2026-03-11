@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
-  Eye, 
-  CheckCircle2, 
-  Truck, 
-  XCircle, 
+import {
+  Search,
+  Filter,
+  Eye,
+  CheckCircle2,
+  Truck,
+  XCircle,
   Clock,
   ExternalLink,
   Phone,
@@ -43,55 +43,21 @@ export default function Orders() {
   const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('all');
 
-  // Get order ID and highlight flag from URL params
-  const orderIdFromNotification = searchParams.get('order');
-  const shouldHighlight = searchParams.get('highlight') === 'true';
-
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  // Auto-open and highlight order from notification
-  useEffect(() => {
-    if (orderIdFromNotification && orders.length > 0) {
-      const targetOrder = orders.find(o => o.id === parseInt(orderIdFromNotification));
-      if (targetOrder) {
-        setSelectedOrder(targetOrder);
-        
-        // Scroll to the order in the table
-        setTimeout(() => {
-          const orderRow = document.querySelector(`[data-order-id="${targetOrder.id}"]`);
-          if (orderRow) {
-            orderRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      }
-    }
-  }, [orderIdFromNotification, orders]);
-
-  const FINAL_STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled'];
-  const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+  const tabs = [
+    { id: 'all', label: 'الكل' },
+    { id: 'pending', label: 'الجديدة' },
+    { id: 'confirmed', label: 'المؤكدة' },
+    { id: 'shipped', label: 'قيد الشحن' },
+    { id: 'delivered', label: 'المستلمة' },
+    { id: 'cancelled', label: 'الملغاة/المرفوضة' },
+  ];
 
   async function fetchOrders() {
     setLoading(true);
     try {
-      const fiveDaysAgo = new Date(Date.now() - FIVE_DAYS_MS).toISOString();
-      const { data: oldOrders } = await supabase
-        .from('orders')
-        .select('id')
-        .in('status', FINAL_STATUSES)
-        .lt('created_at', fiveDaysAgo);
-      
-      if (oldOrders?.length) {
-        await supabase.from('orders').delete().in('id', oldOrders.map(o => o.id));
-      }
-
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -100,7 +66,9 @@ export default function Orders() {
           items:order_items(*)
         `)
         .order('created_at', { ascending: false });
-      
+
+      if (error) throw error;
+
       const sorted = (data as any[] || []).sort((a, b) => {
         const aPending = a.status === 'pending';
         const bPending = b.status === 'pending';
@@ -108,7 +76,7 @@ export default function Orders() {
         if (!aPending && bPending) return 1;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-      
+
       // Fetch product details for each order item
       const ordersWithProducts = await Promise.all(
         sorted.map(async (order) => {
@@ -116,8 +84,7 @@ export default function Orders() {
             (order.items || []).map(async (item) => {
               let product = null;
               let variant = null;
-              
-              // Try to get regular product first
+
               if (item.product_id) {
                 const { data: regularProduct } = await supabase
                   .from('products')
@@ -126,8 +93,7 @@ export default function Orders() {
                   .single();
                 product = regularProduct;
               }
-              
-              // Try to get featured product if regular product not found
+
               if (!product && item.product_id) {
                 const { data: featuredProduct } = await supabase
                   .from('featured_products')
@@ -136,8 +102,7 @@ export default function Orders() {
                   .single();
                 product = featuredProduct;
               }
-              
-              // Get variant details
+
               if (item.variant_id) {
                 const { data: variantData } = await supabase
                   .from('product_variants')
@@ -146,30 +111,16 @@ export default function Orders() {
                   .single();
                 variant = variantData;
               }
-              
-              return {
-                ...item,
-                product,
-                variant
-              };
+
+              return { ...item, product, variant };
             })
           );
-          
-          return {
-            ...order,
-            items: itemsWithProducts
-          };
+
+          return { ...order, items: itemsWithProducts };
         })
       );
-      
+
       setOrders(ordersWithProducts);
-      
-      // Reserve stock for new pending orders
-      for (const order of sorted) {
-        if (order.status === 'pending') {
-          await reserveStock(order);
-        }
-      }
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -177,251 +128,40 @@ export default function Orders() {
     }
   }
 
-  const handleConfirmClick = () => {
-    setShowConfirmModal(true);
-  };
-
-  // Return stock when order is cancelled
-  const returnStock = async (order: Order) => {
-    if (!order.items?.length) return;
-    
-    try {
-      for (const item of order.items) {
-        if (!item.variant_id) continue;
-        
-        const { data: variant } = await supabase
-          .from('product_variants')
-          .select('quantity')
-          .eq('id', item.variant_id)
-          .single();
-          
-        if (variant) {
-          const currentStock = variant.quantity || 0;
-          const newStock = currentStock + item.quantity;
-          
-          await supabase
-            .from('product_variants')
-            .update({ quantity: newStock })
-            .eq('id', item.variant_id);
-            
-          console.log(`Returned ${item.quantity} units to stock for variant ${item.variant_id}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error returning stock:', error);
-    }
-  };
-
-  // Reserve stock when order is created (pending) - No longer needed with immediate deduction
-  const reserveStock = async (order: Order) => {
-    // This function is no longer needed as we deduct stock immediately
-    console.log('Stock reservation skipped - using immediate deduction');
-  };
-
-  // Release reserved stock when order is cancelled
-  const releaseReservedStock = async (order: Order) => {
-    if (!order.items?.length) return;
-    
-    try {
-      for (const item of order.items) {
-        if (!item.variant_id) continue;
-        
-        const { data: variant } = await supabase
-          .from('product_variants')
-          .select('reserved_quantity')
-          .eq('id', item.variant_id)
-          .single();
-          
-        if (variant && variant.reserved_quantity) {
-          const newReserved = Math.max(0, variant.reserved_quantity - item.quantity);
-          await supabase
-            .from('product_variants')
-            .update({ reserved_quantity: newReserved })
-            .eq('id', item.variant_id);
-        }
-      }
-    } catch (error) {
-      console.error('Error releasing reserved stock:', error);
-    }
-  };
-
-  const updateStatus = async (orderId: number, newStatus: string, stockType?: 'normal' | 'reserved') => {
-    const order = selectedOrder || orders.find(o => o.id === orderId);
-    if (!order) return;
+  const handleDeleteOrder = async () => {
+    if (!selectedOrder) return;
+    if (!window.confirm(`هل أنت متأكد من حذف الطلب #${selectedOrder.id.toString().padStart(5, '0')} نهائياً؟ سيتم حذف كافة سجلات الطلب والمنتجات المرتبطة به من قاعدة البيانات.`)) return;
 
     setUpdatingStatus(true);
     try {
-      // Handle stock operations based on status changes
-    const oldStatus = order.status;
-    
-    // If cancelling, return stock to inventory
-    if (newStatus === 'cancelled' && oldStatus === 'pending') {
-      await returnStock(order);
-    }
-    
-    // If confirming from pending, stock is already deducted
-    if (newStatus === 'confirmed' && oldStatus === 'pending') {
-      // Stock was already deducted when order was created
-      console.log('Order confirmed - stock already deducted');
-    }
+      // Cascade delete is usually better handled by DB constraints, but we do it manually to be safe
+      const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', selectedOrder.id);
+      if (itemsErr) throw itemsErr;
 
-      const orderPayload: Record<string, unknown> = { status: newStatus };
+      const { error } = await supabase.from('orders').delete().eq('id', selectedOrder.id);
+      if (error) throw error;
 
-      const { error: orderErr } = await supabase
-        .from('orders')
-        .update(orderPayload)
-        .eq('id', orderId);
-
-      if (orderErr) {
-        alert(`فشل تحديث حالة الطلب: ${orderErr.message}`);
-        setUpdatingStatus(false);
-        return;
-      }
-
-      setShowConfirmModal(false);
-      setOrders(prevOrders => 
-        prevOrders.map(o => 
-          o.id === orderId 
-            ? { ...o, status: newStatus as Order['status'] }
-            : o
-        )
-      );
-      setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
+      setSelectedOrder(null);
+      fetchOrders();
     } catch (err) {
-      console.error('Error updating status:', err);
-      alert(`حدث خطأ: ${err instanceof Error ? err.message : 'غير معروف'}`);
+      console.error('Error deleting order:', err);
+      alert(`فشل حذف الطلب: ${err instanceof Error ? err.message : 'غير معروف'}`);
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  const handlePrint = () => {
-    if (!selectedOrder) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  const filteredOrders = orders.filter(o => {
+    const matchesSearch = `${o.first_name} ${o.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.phone.includes(searchTerm) ||
+      o.id.toString().includes(searchTerm);
 
-    const itemsHtml = selectedOrder.items?.map(item => {
-      const product = item.product;
-      return `
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #eee;">${product?.name_ar || 'منتج غير معروف'}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.variant?.size || '-'} / ${item.variant?.color || '-'}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.quantity}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #eee;">${formatCurrency(item.price_at_purchase * item.quantity)}</td>
-      </tr>
-    `}).join('');
-
-    printWindow.document.write(`
-      <html dir="rtl">
-        <head>
-          <title>فاتورة طلب #${selectedOrder.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            th { background: #f9f9f9; padding: 10px; text-align: right; border-bottom: 2px solid #eee; }
-            .totals { text-align: left; }
-            .totals p { margin: 5px 0; }
-            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>YourTshirtDZ</h1>
-            <div>
-              <p><strong>رقم الطلب:</strong> #${selectedOrder.id}</p>
-              <p><strong>التاريخ:</strong> ${new Date(selectedOrder.created_at).toLocaleDateString('ar-DZ')}</p>
-            </div>
-          </div>
-          
-          <div class="info-grid">
-            <div>
-              <h3>معلومات الزبون</h3>
-              <p><strong>الاسم:</strong> ${selectedOrder.first_name} ${selectedOrder.last_name}</p>
-              <p><strong>الهاتف:</strong> ${selectedOrder.phone}</p>
-            </div>
-            <div>
-              <h3>معلومات الشحن</h3>
-              <p><strong>الولاية:</strong> ${selectedOrder.wilaya?.name_ar}</p>
-              <p><strong>العنوان:</strong> ${selectedOrder.address}</p>
-              <p><strong>طريقة التوصيل:</strong> ${selectedOrder.delivery_method === 'home' ? 'توصيل للمنزل' : 'توصيل للمكتب'}</p>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>المقاس/اللون</th>
-                <th>الكمية</th>
-                <th>السعر</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <div class="totals">
-            <p>المجموع الفرعي: ${formatCurrency(selectedOrder.total_amount - selectedOrder.shipping_fee)}</p>
-            <p>رسوم الشحن: ${formatCurrency(selectedOrder.shipping_fee)}</p>
-            <h2 style="margin-top: 10px;">الإجمالي: ${formatCurrency(selectedOrder.total_amount)}</h2>
-          </div>
-
-          <div class="footer">
-            <p>شكراً لتعاملك مع YourTshirtDZ</p>
-          </div>
-
-          <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const handleContact = () => {
-    if (!selectedOrder) return;
-    const phone = selectedOrder.phone.replace(/\s+/g, '');
-    // Format for WhatsApp (Algeria +213)
-    const formattedPhone = phone.startsWith('0') ? '213' + phone.substring(1) : phone;
-    const message = encodeURIComponent(`مرحباً ${selectedOrder.first_name}، نحن من متجر YourTshirtDZ بخصوص طلبك رقم #${selectedOrder.id}`);
-    window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
-  };
-
-  const handleDeleteOrder = async () => {
-    if (!selectedOrder) return;
-    if (!window.confirm(`هل أنت متأكد من حذف الطلب #${selectedOrder.id.toString().padStart(5, '0')}؟ لا يمكن التراجع.`)) return;
-    try {
-      const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', selectedOrder.id);
-      if (itemsErr) {
-        alert(`فشل الحذف: ${itemsErr.message}`);
-        return;
-      }
-      const { error } = await supabase.from('orders').delete().eq('id', selectedOrder.id);
-      if (error) throw error;
-      setSelectedOrder(null);
-      setShowConfirmModal(false);
-      fetchOrders();
-    } catch (err) {
-      console.error('Error deleting order:', err);
-      alert(`فشل حذف الطلب: ${err instanceof Error ? err.message : 'غير معروف'}`);
-    }
-  };
-
-  const filteredOrders = orders.filter(o => 
-    `${o.first_name} ${o.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.phone.includes(searchTerm) ||
-    o.id.toString().includes(searchTerm)
-  );
+    if (activeTab === 'all') return matchesSearch;
+    return matchesSearch && o.status === activeTab;
+  });
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-8"
@@ -429,7 +169,7 @@ export default function Orders() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold">الطلبات</h1>
-          <p className="text-brand-black/50 mt-1">تتبع وإدارة طلبات الزبائن.</p>
+          <p className="text-brand-black/50 mt-1">تتبع وإدارة طلبات الزبائن وتصنيفها.</p>
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary flex items-center gap-2">
@@ -439,24 +179,41 @@ export default function Orders() {
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-black/30" size={20} />
-          <input 
-            type="text" 
-            placeholder="البحث بالاسم، الهاتف أو رقم الطلب..." 
-            className="input-field pr-12"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-black/30" size={20} />
+            <input
+              type="text"
+              placeholder="البحث بالاسم، الهاتف أو رقم الطلب..."
+              className="input-field pr-12"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-          {['الكل', 'قيد الانتظار', 'تم التأكيد', 'تم الشحن', 'تم التوصيل', 'ملغى'].map(status => (
-            <button 
-              key={status}
-              className="px-4 py-2 rounded-xl text-sm font-bold border border-brand-border hover:bg-brand-black hover:text-brand-white transition-all whitespace-nowrap capitalize"
+
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "px-6 py-3 rounded-2xl text-sm font-bold transition-all whitespace-nowrap border",
+                activeTab === tab.id
+                  ? "bg-brand-black text-brand-white border-brand-black shadow-lg"
+                  : "bg-white text-brand-black/50 border-brand-border hover:border-brand-black/30"
+              )}
             >
-              {status}
+              {tab.label}
+              {tab.id !== 'all' && (
+                <span className={cn(
+                  "mr-2 px-2 py-0.5 rounded-full text-[10px]",
+                  activeTab === tab.id ? "bg-white/20 text-white" : "bg-brand-gray text-brand-black/40"
+                )}>
+                  {orders.filter(o => o.status === tab.id).length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -479,8 +236,8 @@ export default function Orders() {
             </thead>
             <tbody>
               {filteredOrders.map((order) => (
-                <tr 
-                  key={order.id} 
+                <tr
+                  key={order.id}
                   data-order-id={order.id}
                   className={cn(
                     "border-b border-brand-border hover:bg-brand-gray/20 transition-colors group",
@@ -517,7 +274,7 @@ export default function Orders() {
                     {new Date(order.created_at).toLocaleDateString()}
                   </td>
                   <td className="p-6 text-left">
-                    <button 
+                    <button
                       onClick={() => setSelectedOrder(order)}
                       className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
                     >
@@ -542,14 +299,14 @@ export default function Orders() {
       <AnimatePresence>
         {selectedOrder && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => { setSelectedOrder(null); setShowConfirmModal(false); }}
               className="absolute inset-0 bg-brand-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -659,11 +416,11 @@ export default function Orders() {
                         <Clock size={18} />
                         <span className="text-xs font-bold uppercase tracking-widest">إدارة الحالة</span>
                       </div>
-                      
+
                       {/* Status Timeline */}
                       <div className="relative">
                         <div className="absolute right-6 top-8 bottom-8 w-0.5 bg-brand-border"></div>
-                        
+
                         <div className="space-y-4">
                           {[
                             { id: 'pending', label: 'قيد الانتظار', icon: Clock, description: 'طلب جديد' },
@@ -676,7 +433,7 @@ export default function Orders() {
                             const isPast = index < [
                               'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'
                             ].indexOf(selectedOrder.status);
-                            
+
                             return (
                               <div key={status.id} className="relative flex items-center gap-4">
                                 {/* Status Node */}
@@ -685,11 +442,11 @@ export default function Orders() {
                                     onClick={() => updateStatus(selectedOrder.id, status.id)}
                                     className={cn(
                                       "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                                      isActive 
-                                        ? "bg-brand-black text-brand-white border-brand-black shadow-lg scale-110" 
+                                      isActive
+                                        ? "bg-brand-black text-brand-white border-brand-black shadow-lg scale-110"
                                         : isPast
-                                        ? "bg-emerald-500 text-white border-emerald-500"
-                                        : "bg-brand-white text-brand-black/40 border-brand-border hover:border-brand-black/60 hover:scale-105"
+                                          ? "bg-emerald-500 text-white border-emerald-500"
+                                          : "bg-brand-white text-brand-black/40 border-brand-border hover:border-brand-black/60 hover:scale-105"
                                     )}
                                   >
                                     <status.icon size={20} />
@@ -698,7 +455,7 @@ export default function Orders() {
                                     <div className="absolute -inset-1 bg-brand-black/20 rounded-full animate-ping"></div>
                                   )}
                                 </div>
-                                
+
                                 {/* Status Content */}
                                 <div className="flex-1">
                                   <button
@@ -762,19 +519,19 @@ export default function Orders() {
                     )}
 
                     <div className="glass-card p-6">
-                      <button 
+                      <button
                         onClick={handlePrint}
                         className="w-full btn-secondary flex items-center justify-center gap-2 mb-3"
                       >
                         طباعة الفاتورة
                       </button>
-                      <button 
+                      <button
                         onClick={handleContact}
                         className="w-full btn-secondary flex items-center justify-center gap-2 mb-3"
                       >
                         الاتصال بالزبون (واتساب)
                       </button>
-                      <button 
+                      <button
                         onClick={handleDeleteOrder}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 hover:bg-rose-50 transition-all"
                       >

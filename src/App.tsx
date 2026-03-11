@@ -165,6 +165,32 @@ export default function App() {
     };
   }, []);
 
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
+  useEffect(() => {
+    fetchPendingCount();
+
+    // Subscribe to changes in orders to update count
+    const countChannel = supabase
+      .channel('orders-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchPendingCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(countChannel);
+    };
+  }, []);
+
+  async function fetchPendingCount() {
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    setPendingOrdersCount(count || 0);
+  }
+
   return (
     <div className="flex h-screen bg-brand-white overflow-hidden font-sans">
       {/* Mobile Backdrop */}
@@ -207,25 +233,39 @@ export default function App() {
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
+            const hasBadge = item.path === '/orders' && pendingOrdersCount > 0;
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all group",
+                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all group relative",
                   isActive
-                    ? "bg-brand-white text-brand-black"
+                    ? "bg-brand-white text-brand-black shadow-lg shadow-white/10"
                     : "text-brand-white/60 hover:bg-brand-white/10 hover:text-brand-white"
                 )}
               >
                 <Icon size={20} className={cn(isActive ? "text-brand-black" : "group-hover:scale-110 transition-transform")} />
-                {(isSidebarOpen || isMobile) && <span className="font-medium">{item.name}</span>}
+                {(isSidebarOpen || isMobile) && (
+                  <div className="flex items-center justify-between flex-1">
+                    <span className="font-medium">{item.name}</span>
+                    {hasBadge && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
+                        {pendingOrdersCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!isSidebarOpen && !isMobile && hasBadge && (
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-brand-black animate-ping" />
+                )}
                 {isActive && (isSidebarOpen || isMobile) && (
                   <motion.div
                     layoutId="activeNav"
-                    className="mr-auto"
+                    className="mr-2"
                   >
-                    <ChevronRight size={16} className="rotate-180" />
+                    <ChevronRight size={16} className="rotate-180 opacity-40" />
                   </motion.div>
                 )}
               </Link>
