@@ -87,7 +87,7 @@ export default function Categories() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {categories.map((category) => (
-          <motion.div 
+          <motion.div
             key={category.id}
             layout
             className="glass-card group overflow-hidden"
@@ -101,13 +101,13 @@ export default function Categories() {
                 </div>
               )}
               <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                <button 
+                <button
                   onClick={() => handleOpenModal(category)}
                   className="p-3 bg-brand-white text-brand-black rounded-full hover:scale-110 transition-transform"
                 >
                   <Edit2 size={18} />
                 </button>
-                <button 
+                <button
                   onClick={() => handleDelete(category.id)}
                   className="p-3 bg-rose-500 text-brand-white rounded-full hover:scale-110 transition-transform"
                 >
@@ -132,16 +132,17 @@ export default function Categories() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-sm font-bold">الاسم (بالعربية)</label>
-                  <input required dir="rtl" className="input-field" value={formData.name_ar} onChange={e => setFormData({...formData, name_ar: e.target.value})} />
+                  <input required dir="rtl" className="input-field" value={formData.name_ar} onChange={e => setFormData({ ...formData, name_ar: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
-                  <input required className="input-field" value={formData.name_en} onChange={e => setFormData({...formData, name_en: e.target.value})} />
+                  <input required className="input-field" value={formData.name_en} onChange={e => setFormData({ ...formData, name_en: e.target.value })} />
                 </div>
-                <ImageUpload 
+                <ImageUpload
                   label="صورة الصنف"
-                  value={formData.image_url}
-                  onChange={url => setFormData({...formData, image_url: url})}
+                  urls={formData.image_url ? [formData.image_url] : []}
+                  publicIds={[]}
+                  onChange={urls => setFormData({ ...formData, image_url: urls[0] || '' })}
                 />
                 <div className="pt-4 flex gap-3">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary flex-1">إلغاء</button>

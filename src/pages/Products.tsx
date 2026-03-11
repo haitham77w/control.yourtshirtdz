@@ -12,7 +12,8 @@ import {
   Image as ImageIcon,
   Check,
   X,
-  ChevronDown
+  ChevronDown,
+  Copy
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -109,6 +110,34 @@ export default function Products() {
       });
       setVariants([]);
     }
+    setIsModalOpen(true);
+  };
+
+  const handleCopy = (product: Product) => {
+    // Open modal with product data but treat as new product
+    setEditingProduct(null);
+    setFormData({
+      name_ar: `${product.name_ar} (نسخة)`,
+      name_en: `${product.name_en} - copy`,
+      description_ar: product.description_ar || '',
+      description_en: product.description_en || '',
+      price: product.price.toString(),
+      original_price: product.original_price?.toString() || '',
+      category_id: product.category_id?.toString() || '',
+      images_urls: product.images_urls || [],
+      images_public_ids: product.images_public_ids || [],
+      is_active: product.is_active
+    });
+
+    const vList = product.variants || (product as any).product_variants || [];
+    setVariants(
+      vList.map((v: ProductVariant) => ({
+        // We strip the ID so it's created as a new record
+        size: v.size || '',
+        color: v.color || '',
+        quantity: v.quantity.toString()
+      }))
+    );
     setIsModalOpen(true);
   };
 
@@ -408,6 +437,13 @@ export default function Products() {
                         title="تعديل المنتج"
                       >
                         <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleCopy(product)}
+                        className="p-2 hover:bg-brand-black hover:text-brand-white rounded-lg transition-all"
+                        title="نسخ المنتج"
+                      >
+                        <Copy size={16} />
                       </button>
                       <button
                         onClick={() => toggleFeatured(product)}
