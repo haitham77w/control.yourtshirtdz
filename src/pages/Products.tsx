@@ -59,6 +59,10 @@ export default function Products({ showToast }: ProductsProps) {
     product: null
   });
 
+  // Quick Add Mode
+  const [isQuickMode, setIsQuickMode] = useState(false);
+  const [quickName, setQuickName] = useState('');
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -126,6 +130,8 @@ export default function Products({ showToast }: ProductsProps) {
       });
       setVariants([]);
     }
+    setIsQuickMode(false);
+    setQuickName('');
     setIsModalOpen(true);
   };
 
@@ -154,6 +160,8 @@ export default function Products({ showToast }: ProductsProps) {
         quantity: v.quantity.toString()
       }))
     );
+    setIsQuickMode(false);
+    setQuickName('');
     setIsModalOpen(true);
   };
 
@@ -277,6 +285,8 @@ export default function Products({ showToast }: ProductsProps) {
 
     const payload = {
       ...formData,
+      name_ar: isQuickMode ? quickName : formData.name_ar,
+      name_en: isQuickMode ? quickName : formData.name_en,
       price: parseFloat(formData.price),
       original_price: formData.original_price ? parseFloat(formData.original_price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
@@ -660,36 +670,67 @@ export default function Products({ showToast }: ProductsProps) {
               className="relative w-full max-w-2xl bg-brand-white rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-8 border-b border-brand-border flex items-center justify-between">
-                <h2 className="text-2xl font-bold">{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h2>
+                <div>
+                  <h2 className="text-2xl font-bold">{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h2>
+                  {!editingProduct && (
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickMode(!isQuickMode)}
+                      className={cn(
+                        "mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all",
+                        isQuickMode 
+                          ? "bg-brand-black text-white border-brand-black shadow-lg shadow-brand-black/20" 
+                          : "bg-white text-brand-black border-brand-border hover:bg-brand-gray"
+                      )}
+                    >
+                      <Zap size={12} className={cn(isQuickMode && "fill-current")} />
+                      {isQuickMode ? 'وضع الإضافة السريعة: نشط' : 'تفعيل الإضافة السريعة'}
+                    </button>
+                  )}
+                </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-brand-gray rounded-full">
                   <X size={20} />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {isQuickMode ? (
                   <div className="space-y-2">
-                    <label className="text-sm font-bold">الاسم (بالعربية)</label>
-                    <input
-                      required
-                      dir="rtl"
-                      type="text"
-                      className="input-field"
-                      value={formData.name_ar}
-                      onChange={e => setFormData({ ...formData, name_ar: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
+                    <label className="text-sm font-bold">اسم المنتج (واحد لكل اللغتين)</label>
                     <input
                       required
                       type="text"
-                      className="input-field"
-                      value={formData.name_en}
-                      onChange={e => setFormData({ ...formData, name_en: e.target.value })}
+                      className="input-field text-lg py-4"
+                      placeholder="أدخل اسم المنتج هنا..."
+                      value={quickName}
+                      onChange={e => setQuickName(e.target.value)}
                     />
                   </div>
-                </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold">الاسم (بالعربية)</label>
+                      <input
+                        required
+                        dir="rtl"
+                        type="text"
+                        className="input-field"
+                        value={formData.name_ar}
+                        onChange={e => setFormData({ ...formData, name_ar: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
+                      <input
+                        required
+                        type="text"
+                        className="input-field"
+                        value={formData.name_en}
+                        onChange={e => setFormData({ ...formData, name_en: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
