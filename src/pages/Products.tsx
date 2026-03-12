@@ -178,6 +178,53 @@ export default function Products({ showToast }: ProductsProps) {
     { ar: 'أصفر', en: 'Yellow' }
   ];
 
+  // Custom Shortcuts State
+  const [customSizes, setCustomSizes] = useState<string[]>(() => {
+    const saved = localStorage.getItem('custom_sizes');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customColors, setCustomColors] = useState<Array<{ ar: string; en: string }>>(() => {
+    const saved = localStorage.getItem('custom_colors');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [newSize, setNewSize] = useState('');
+  const [newColorAr, setNewColorAr] = useState('');
+  const [newColorEn, setNewColorEn] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('custom_sizes', JSON.stringify(customSizes));
+  }, [customSizes]);
+
+  useEffect(() => {
+    localStorage.setItem('custom_colors', JSON.stringify(customColors));
+  }, [customColors]);
+
+  const addCustomSize = () => {
+    if (newSize && !customSizes.includes(newSize)) {
+      setCustomSizes([...customSizes, newSize]);
+      setNewSize('');
+    }
+  };
+
+  const removeCustomSize = (size: string) => {
+    setCustomSizes(customSizes.filter(s => s !== size));
+    setSelectedSizes(selectedSizes.filter(s => s !== size));
+  };
+
+  const addCustomColor = () => {
+    if (newColorAr && newColorEn && !customColors.some(c => c.en === newColorEn)) {
+      setCustomColors([...customColors, { ar: newColorAr, en: newColorEn }]);
+      setNewColorAr('');
+      setNewColorEn('');
+    }
+  };
+
+  const removeCustomColor = (colorEn: string) => {
+    setCustomColors(customColors.filter(c => c.en !== colorEn));
+    setSelectedColors(selectedColors.filter(c => c.en !== colorEn));
+  };
+
   const generateBulkVariants = () => {
     if (selectedSizes.length === 0 && selectedColors.length === 0) return;
 
@@ -769,6 +816,46 @@ export default function Products({ showToast }: ProductsProps) {
                                   {size}
                                 </button>
                               ))}
+                              {customSizes.map(size => (
+                                <div key={size} className="relative group">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size])}
+                                    className={cn(
+                                      "px-3 py-1.5 rounded-full text-xs font-bold transition-all border pr-8",
+                                      selectedSizes.includes(size)
+                                        ? "bg-indigo-600 text-white border-indigo-600"
+                                        : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300"
+                                    )}
+                                  >
+                                    {size}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); removeCustomSize(size); }}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <input
+                                type="text"
+                                placeholder="إضافة مقاس جديد..."
+                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
+                                value={newSize}
+                                onChange={e => setNewSize(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addCustomSize())}
+                              />
+                              <button
+                                type="button"
+                                onClick={addCustomSize}
+                                className="p-1 px-2 bg-brand-black text-white rounded-lg text-xs"
+                              >
+                                أضف
+                              </button>
                             </div>
                           </div>
 
@@ -794,6 +881,57 @@ export default function Products({ showToast }: ProductsProps) {
                                   {color.ar} / {color.en}
                                 </button>
                               ))}
+                              {customColors.map(color => (
+                                <div key={color.en} className="relative group">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedColors(prev =>
+                                      prev.some(c => c.en === color.en)
+                                        ? prev.filter(c => c.en !== color.en)
+                                        : [...prev, color]
+                                    )}
+                                    className={cn(
+                                      "px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border pr-8",
+                                      selectedColors.some(c => c.en === color.en)
+                                        ? "bg-indigo-600 text-white border-indigo-600"
+                                        : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300"
+                                    )}
+                                  >
+                                    {color.ar} / {color.en}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); removeCustomColor(color.en); }}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <input
+                                type="text"
+                                placeholder="اللون (بالعربية)..."
+                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
+                                value={newColorAr}
+                                onChange={e => setNewColorAr(e.target.value)}
+                              />
+                              <input
+                                type="text"
+                                placeholder="اللون (بالإنجليزي)..."
+                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
+                                value={newColorEn}
+                                onChange={e => setNewColorEn(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addCustomColor())}
+                              />
+                              <button
+                                type="button"
+                                onClick={addCustomColor}
+                                className="p-1 px-2 bg-brand-black text-white rounded-lg text-xs"
+                              >
+                                أضف
+                              </button>
                             </div>
                           </div>
 
