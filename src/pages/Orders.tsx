@@ -120,14 +120,43 @@ export default function Orders({ showToast }: OrdersProps) {
     window.open(`https://wa.me/${selectedOrder.phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const restoreStock = async (orderId: number) => {
+    try {
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('variant_id, quantity, product_variants(id, quantity)')
+        .eq('order_id', orderId);
+
+      for (const item of orderItems || []) {
+        if (item.variant_id && item.product_variants) {
+          const currentStock = (item.product_variants as any).quantity || 0;
+          const restoredStock = currentStock + item.quantity;
+          await supabase
+            .from('product_variants')
+            .update({ quantity: restoredStock })
+            .eq('id', item.variant_id);
+        }
+      }
+    } catch (err) {
+      console.error('Error restoring stock:', err);
+    }
+  };
+
   const updateStatus = async (orderId: number, newStatus: string, mode: 'normal' | 'reserved' = 'normal') => {
     setUpdatingStatus(true);
     try {
+      // If order is being cancelled, restore stock first
+      if (newStatus === 'cancelled') {
+        const currentOrder = orders.find(o => o.id === orderId);
+        if (currentOrder && currentOrder.status !== 'cancelled') {
+          await restoreStock(orderId);
+        }
+      }
+
       const { error } = await supabase
         .from('orders')
         .update({
           status: newStatus,
-          // If we had a column for reservation mode, we'd update it here
         })
         .eq('id', orderId);
 
@@ -393,8 +422,17 @@ export default function Orders({ showToast }: OrdersProps) {
                         {selectedOrder.items?.map((item) => (
                           <div key={item.id} className="p-6 flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 bg-brand-gray rounded-xl overflow-hidden">
-                                <img src={item.product?.image_url || '/placeholder.jpg'} alt="" className="w-full h-full object-cover" />
+                              <div className="w-16 h-16 bg-brand-gray rounded-xl overflow-hidden flex-shrink-0">
+                                <img
+                                  src={
+                                    (item.product as any)?.images_urls?.[0] ||
+                                    item.product?.image_url ||
+                                    '/placeholder.jpg'
+                                  }
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                                />
                               </div>
                               <div>
                                 <p className="font-bold text-sm">{item.product?.name_ar || 'منتج غير معروف'}</p>

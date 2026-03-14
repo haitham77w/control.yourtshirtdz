@@ -13,8 +13,7 @@ import {
   Check,
   X,
   ChevronDown,
-  Copy,
-  Zap
+  Copy
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -59,9 +58,6 @@ export default function Products({ showToast }: ProductsProps) {
     product: null
   });
 
-  // Quick Add Mode
-  const [isQuickMode, setIsQuickMode] = useState(false);
-  const [quickName, setQuickName] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -130,8 +126,6 @@ export default function Products({ showToast }: ProductsProps) {
       });
       setVariants([]);
     }
-    setIsQuickMode(false);
-    setQuickName('');
     setIsModalOpen(true);
   };
 
@@ -160,110 +154,7 @@ export default function Products({ showToast }: ProductsProps) {
         quantity: v.quantity.toString()
       }))
     );
-    setIsQuickMode(false);
-    setQuickName('');
     setIsModalOpen(true);
-  };
-
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-  const [selectedColors, setSelectedColors] = useState<Array<{ ar: string; en: string }>>([]);
-  const [showBulkAdd, setShowBulkAdd] = useState(false);
-  const [productType, setProductType] = useState<'tshirt' | 'pants'>('tshirt');
-
-  const PRESET_SIZES = {
-    tshirt: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
-    pants: ['28', '30', '32', '34', '36', '38', '40', '42']
-  };
-
-  const PRESET_COLORS = [
-    { ar: 'أسود', en: 'Black' },
-    { ar: 'أبيض', en: 'White' },
-    { ar: 'رمادي', en: 'Grey' },
-    { ar: 'كحلي', en: 'Navy' },
-    { ar: 'أحمر', en: 'Red' },
-    { ar: 'أزرق', en: 'Blue' },
-    { ar: 'أخضر', en: 'Green' },
-    { ar: 'أصفر', en: 'Yellow' }
-  ];
-
-  // Custom Shortcuts State
-  const [customSizes, setCustomSizes] = useState<string[]>(() => {
-    const saved = localStorage.getItem('custom_sizes');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [customColors, setCustomColors] = useState<Array<{ ar: string; en: string }>>(() => {
-    const saved = localStorage.getItem('custom_colors');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [newSize, setNewSize] = useState('');
-  const [newColorAr, setNewColorAr] = useState('');
-  const [newColorEn, setNewColorEn] = useState('');
-
-  useEffect(() => {
-    localStorage.setItem('custom_sizes', JSON.stringify(customSizes));
-  }, [customSizes]);
-
-  useEffect(() => {
-    localStorage.setItem('custom_colors', JSON.stringify(customColors));
-  }, [customColors]);
-
-  const addCustomSize = () => {
-    if (newSize && !customSizes.includes(newSize)) {
-      setCustomSizes([...customSizes, newSize]);
-      setNewSize('');
-    }
-  };
-
-  const removeCustomSize = (size: string) => {
-    setCustomSizes(customSizes.filter(s => s !== size));
-    setSelectedSizes(selectedSizes.filter(s => s !== size));
-  };
-
-  const addCustomColor = () => {
-    if (newColorAr && newColorEn && !customColors.some(c => c.en === newColorEn)) {
-      setCustomColors([...customColors, { ar: newColorAr, en: newColorEn }]);
-      setNewColorAr('');
-      setNewColorEn('');
-    }
-  };
-
-  const removeCustomColor = (colorEn: string) => {
-    setCustomColors(customColors.filter(c => c.en !== colorEn));
-    setSelectedColors(selectedColors.filter(c => c.en !== colorEn));
-  };
-
-  const generateBulkVariants = () => {
-    if (selectedSizes.length === 0 && selectedColors.length === 0) return;
-
-    const newVariants: Array<{ size: string; color: string; quantity: string }> = [];
-
-    // If only sizes are selected
-    if (selectedSizes.length > 0 && selectedColors.length === 0) {
-      selectedSizes.forEach(size => {
-        newVariants.push({ size, color: '', quantity: '0' });
-      });
-    }
-    // If only colors are selected
-    else if (selectedSizes.length === 0 && selectedColors.length > 0) {
-      selectedColors.forEach(color => {
-        newVariants.push({ size: '', color: `${color.ar} / ${color.en}`, quantity: '0' });
-      });
-    }
-    // If both are selected, generate combinations
-    else {
-      selectedSizes.forEach(size => {
-        selectedColors.forEach(color => {
-          newVariants.push({ size, color: `${color.ar} / ${color.en}`, quantity: '0' });
-        });
-      });
-    }
-
-    setVariants([...variants, ...newVariants]);
-    // Reset selections after generating
-    setSelectedSizes([]);
-    setSelectedColors([]);
-    setShowBulkAdd(false);
   };
 
   const addVariant = () => {
@@ -285,8 +176,6 @@ export default function Products({ showToast }: ProductsProps) {
 
     const payload = {
       ...formData,
-      name_ar: isQuickMode ? quickName : formData.name_ar,
-      name_en: isQuickMode ? quickName : formData.name_en,
       price: parseFloat(formData.price),
       original_price: formData.original_price ? parseFloat(formData.original_price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
@@ -541,7 +430,7 @@ export default function Products({ showToast }: ProductsProps) {
 
                 const getStockBadge = (stock: number) => {
                   if (stock === 0) return <span className="px-2 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-black border border-rose-100 flex items-center gap-1 w-fit"><X size={10} /> نفذ</span>;
-                  if (stock <= 5) return <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black border border-amber-100 flex items-center gap-1 w-fit"><Zap size={10} /> منخفض</span>;
+                  if (stock <= 5) return <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black border border-amber-100 flex items-center gap-1 w-fit">منخفض</span>;
                   return <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black border border-emerald-100 flex items-center gap-1 w-fit"><Check size={10} /> متوفر</span>;
                 };
 
@@ -672,21 +561,6 @@ export default function Products({ showToast }: ProductsProps) {
               <div className="p-8 border-b border-brand-border flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h2>
-                  {!editingProduct && (
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickMode(!isQuickMode)}
-                      className={cn(
-                        "mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all",
-                        isQuickMode 
-                          ? "bg-brand-black text-white border-brand-black shadow-lg shadow-brand-black/20" 
-                          : "bg-white text-brand-black border-brand-border hover:bg-brand-gray"
-                      )}
-                    >
-                      <Zap size={12} className={cn(isQuickMode && "fill-current")} />
-                      {isQuickMode ? 'وضع الإضافة السريعة: نشط' : 'تفعيل الإضافة السريعة'}
-                    </button>
-                  )}
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-brand-gray rounded-full">
                   <X size={20} />
@@ -694,43 +568,29 @@ export default function Products({ showToast }: ProductsProps) {
               </div>
 
               <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                {isQuickMode ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold">اسم المنتج (واحد لكل اللغتين)</label>
+                    <label className="text-sm font-bold">الاسم (بالعربية)</label>
+                    <input
+                      required
+                      dir="rtl"
+                      type="text"
+                      className="input-field"
+                      value={formData.name_ar}
+                      onChange={e => setFormData({ ...formData, name_ar: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
                     <input
                       required
                       type="text"
-                      className="input-field text-lg py-4"
-                      placeholder="أدخل اسم المنتج هنا..."
-                      value={quickName}
-                      onChange={e => setQuickName(e.target.value)}
+                      className="input-field"
+                      value={formData.name_en}
+                      onChange={e => setFormData({ ...formData, name_en: e.target.value })}
                     />
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">الاسم (بالعربية)</label>
-                      <input
-                        required
-                        dir="rtl"
-                        type="text"
-                        className="input-field"
-                        value={formData.name_ar}
-                        onChange={e => setFormData({ ...formData, name_ar: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">الاسم (بالإنجليزي)</label>
-                      <input
-                        required
-                        type="text"
-                        className="input-field"
-                        value={formData.name_en}
-                        onChange={e => setFormData({ ...formData, name_en: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -779,215 +639,15 @@ export default function Products({ showToast }: ProductsProps) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold">متغيرات المنتج (المقاس، اللون، المخزون)</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowBulkAdd(!showBulkAdd)}
-                        className={cn(
-                          "flex items-center gap-2 text-xs py-2 px-3 rounded-lg border transition-all",
-                          showBulkAdd
-                            ? "bg-brand-black text-white border-brand-black"
-                            : "bg-white text-brand-black border-brand-border hover:bg-brand-gray"
-                        )}
-                      >
-                        <Zap size={14} />
-                        إضافة سريعة
-                      </button>
-                      <button
-                        type="button"
-                        onClick={addVariant}
-                        className="btn-secondary flex items-center gap-2 text-xs py-2 px-3"
-                      >
-                        <Plus size={14} />
-                        إضافة يدوي
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={addVariant}
+                      className="btn-secondary flex items-center gap-2 text-xs py-2 px-3"
+                    >
+                      <Plus size={14} />
+                      إضافة يدوي
+                    </button>
                   </div>
-
-                  <AnimatePresence>
-                    {showBulkAdd && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="p-4 bg-brand-gray/30 rounded-2xl border border-brand-border space-y-4">
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">نوع المنتج</p>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => { setProductType('tshirt'); setSelectedSizes([]); }}
-                                className={cn(
-                                  "flex-1 py-2 rounded-xl text-xs font-bold border transition-all",
-                                  productType === 'tshirt' ? "bg-brand-black text-white border-brand-black" : "bg-white text-brand-black border-brand-border"
-                                )}
-                              >
-                                تيشرت / قميص
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setProductType('pants'); setSelectedSizes([]); }}
-                                className={cn(
-                                  "flex-1 py-2 rounded-xl text-xs font-bold border transition-all",
-                                  productType === 'pants' ? "bg-brand-black text-white border-brand-black" : "bg-white text-brand-black border-brand-border"
-                                )}
-                              >
-                                سروال / بنطلون
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">اختر المقاسات ({productType === 'tshirt' ? 'حروف' : 'أرقام'})</p>
-                            <div className="flex flex-wrap gap-2">
-                              {PRESET_SIZES[productType].map(size => (
-                                <button
-                                  key={size}
-                                  type="button"
-                                  onClick={() => setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size])}
-                                  className={cn(
-                                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                                    selectedSizes.includes(size)
-                                      ? "bg-brand-black text-white border-brand-black"
-                                      : "bg-white text-brand-black border-brand-border hover:border-brand-black/30"
-                                  )}
-                                >
-                                  {size}
-                                </button>
-                              ))}
-                              {customSizes.map(size => (
-                                <div key={size} className="relative group">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size])}
-                                    className={cn(
-                                      "px-3 py-1.5 rounded-full text-xs font-bold transition-all border pr-8",
-                                      selectedSizes.includes(size)
-                                        ? "bg-indigo-600 text-white border-indigo-600"
-                                        : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300"
-                                    )}
-                                  >
-                                    {size}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); removeCustomSize(size); }}
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                              <input
-                                type="text"
-                                placeholder="إضافة مقاس جديد..."
-                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
-                                value={newSize}
-                                onChange={e => setNewSize(e.target.value)}
-                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addCustomSize())}
-                              />
-                              <button
-                                type="button"
-                                onClick={addCustomSize}
-                                className="p-1 px-2 bg-brand-black text-white rounded-lg text-xs"
-                              >
-                                أضف
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-brand-black/40 uppercase tracking-wider text-right">اختر الألوان (لغتين)</p>
-                            <div className="flex flex-wrap gap-2">
-                              {PRESET_COLORS.map(color => (
-                                <button
-                                  key={color.en}
-                                  type="button"
-                                  onClick={() => setSelectedColors(prev =>
-                                    prev.some(c => c.en === color.en)
-                                      ? prev.filter(c => c.en !== color.en)
-                                      : [...prev, color]
-                                  )}
-                                  className={cn(
-                                    "px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border",
-                                    selectedColors.some(c => c.en === color.en)
-                                      ? "bg-brand-black text-white border-brand-black"
-                                      : "bg-white text-brand-black border-brand-border hover:border-brand-black/30"
-                                  )}
-                                >
-                                  {color.ar} / {color.en}
-                                </button>
-                              ))}
-                              {customColors.map(color => (
-                                <div key={color.en} className="relative group">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedColors(prev =>
-                                      prev.some(c => c.en === color.en)
-                                        ? prev.filter(c => c.en !== color.en)
-                                        : [...prev, color]
-                                    )}
-                                    className={cn(
-                                      "px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border pr-8",
-                                      selectedColors.some(c => c.en === color.en)
-                                        ? "bg-indigo-600 text-white border-indigo-600"
-                                        : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300"
-                                    )}
-                                  >
-                                    {color.ar} / {color.en}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); removeCustomColor(color.en); }}
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                              <input
-                                type="text"
-                                placeholder="اللون (بالعربية)..."
-                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
-                                value={newColorAr}
-                                onChange={e => setNewColorAr(e.target.value)}
-                              />
-                              <input
-                                type="text"
-                                placeholder="اللون (بالإنجليزي)..."
-                                className="flex-1 text-[11px] py-1 px-3 border border-brand-border rounded-lg bg-white"
-                                value={newColorEn}
-                                onChange={e => setNewColorEn(e.target.value)}
-                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addCustomColor())}
-                              />
-                              <button
-                                type="button"
-                                onClick={addCustomColor}
-                                className="p-1 px-2 bg-brand-black text-white rounded-lg text-xs"
-                              >
-                                أضف
-                              </button>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={generateBulkVariants}
-                            disabled={selectedSizes.length === 0 && selectedColors.length === 0}
-                            className="w-full py-3 bg-brand-black text-white rounded-xl text-xs font-bold hover:bg-brand-black/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            توليد التشكيلات ({Math.max(1, selectedSizes.length) * Math.max(1, selectedColors.length)})
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                   {variants.length > 0 && (
                     <div className="border border-brand-border rounded-xl overflow-hidden">
                       <div className="grid grid-cols-12 gap-2 p-3 bg-brand-gray/50 text-xs font-bold text-brand-black/60">
